@@ -12,11 +12,25 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v3
-      
-      - name: Deploy
+        with:
+          fetch-depth: 0 # Fetch all history for proper deployment
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+
+      - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          folder: .
-          branch: gh-pages
+          folder: . # The folder the action should deploy
+          branch: gh-pages # The branch the action should deploy to
+          clean: true # Automatically remove deleted files from the deploy branch
+          clean-exclude: |
+            .nojekyll
+          commit-message: "Deploy website to GitHub Pages"
+          git-config-name: GitHub Actions
+          git-config-email: actions@github.com
+          single-commit: true
