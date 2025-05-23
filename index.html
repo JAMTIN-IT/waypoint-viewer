@@ -133,11 +133,11 @@
         }
         
         .controls-toggle {
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 40px;
-            height: 40px;
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 44px;
+            height: 44px;
             background: white;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
@@ -146,6 +146,7 @@
             justify-content: center;
             cursor: pointer;
             transition: transform 0.3s;
+            z-index: 1010;
         }
         
         .controls-toggle:hover {
@@ -779,7 +780,7 @@
                 <div class="popup-title">🎣 ${waypoint.name}</div>
                 <div class="popup-info">`;
             
-            content += `<div><strong>Coordinates:</strong><br>${waypoint.lat.toFixed(6)}, ${waypoint.lon.toFixed(6)}</div>`;
+            content += `<div><strong>Coordinates:</strong><br>${formatCoordinates(waypoint.lat, waypoint.lon)}</div>`; 
             
             if (waypoint.ele) {
                 const depth = parseFloat(waypoint.ele);
@@ -832,6 +833,26 @@
             }
         }
         
+        // Format coordinates in a more readable way
+        function formatCoordinates(lat, lon) {
+            // Format latitude
+            const latDir = lat >= 0 ? 'N' : 'S';
+            const latAbs = Math.abs(lat);
+            const latDeg = Math.floor(latAbs);
+            const latMin = Math.floor((latAbs - latDeg) * 60);
+            const latSec = ((latAbs - latDeg - latMin / 60) * 3600).toFixed(1);
+            
+            // Format longitude
+            const lonDir = lon >= 0 ? 'E' : 'W';
+            const lonAbs = Math.abs(lon);
+            const lonDeg = Math.floor(lonAbs);
+            const lonMin = Math.floor((lonAbs - lonDeg) * 60);
+            const lonSec = ((lonAbs - lonDeg - lonMin / 60) * 3600).toFixed(1);
+            
+            // Return formatted coordinates in DMS (Degrees, Minutes, Seconds) format
+            return `${latDeg}°${latMin}'${latSec}" ${latDir}, ${lonDeg}°${lonMin}'${lonSec}" ${lonDir}`;
+        }
+        
         // Render list view
         function renderList(filter = '') {
             const listContainer = document.getElementById('waypoint-list');
@@ -851,7 +872,7 @@
                     <div class="waypoint-item" data-index="${originalIndex}">
                         <div class="waypoint-info">
                             <div class="waypoint-name">🎣 ${waypoint.name}</div>
-                            <div class="waypoint-coords">${waypoint.lat.toFixed(6)}, ${waypoint.lon.toFixed(6)}</div>
+                            <div class="waypoint-coords">📍 ${formatCoordinates(waypoint.lat, waypoint.lon)}</div>
                             ${waypoint.desc && waypoint.desc !== waypoint.name ? 
                                 `<div class="waypoint-desc">${waypoint.desc.substring(0, 100)}${waypoint.desc.length > 100 ? '...' : ''}</div>` : ''}
                         </div>
