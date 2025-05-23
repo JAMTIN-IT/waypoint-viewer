@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Waypoint Viewer</title>
+    <title>Fishing Waypoint Viewer</title>
     
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
@@ -58,7 +58,7 @@
             background: none;
             border: none;
             color: #ecf0f1;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 500;
             cursor: pointer;
             transition: background 0.3s;
@@ -66,7 +66,7 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 4px;
+            gap: 2px;
         }
         
         .nav-button:hover {
@@ -79,7 +79,7 @@
         }
         
         .nav-icon {
-            font-size: 20px;
+            font-size: 18px;
         }
         
         .controls-wrapper {
@@ -92,6 +92,44 @@
         
         .controls-wrapper.show {
             display: block;
+        }
+        
+        .file-input-wrapper {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 10px;
+            display: none;
+        }
+        
+        .file-input-wrapper.show {
+            display: block;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
+        .file-input-button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.3s;
+        }
+        
+        .file-input-button:hover {
+            background: #2980b9;
         }
         
         .controls-toggle {
@@ -123,13 +161,13 @@
             top: 50px;
             right: 0;
             background: white;
-            padding: 10px;
+            padding: 12px;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
             display: none;
             flex-direction: column;
-            gap: 8px;
-            min-width: 140px;
+            gap: 10px;
+            min-width: 160px;
         }
         
         .controls.expanded {
@@ -139,13 +177,14 @@
         .toggle-control {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
         }
         
         .toggle-control label {
             font-size: 14px;
             color: #2c3e50;
-            min-width: 80px;
+            min-width: 90px;
+            font-weight: 500;
         }
         
         .toggle {
@@ -329,6 +368,10 @@
             transform: translate(-50%, -50%);
             text-align: center;
             z-index: 2000;
+            background: rgba(255,255,255,0.95);
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
         }
         
         .loading-spinner {
@@ -347,13 +390,14 @@
         }
         
         .popup-content {
-            max-width: 250px;
+            max-width: 280px;
         }
         
         .popup-title {
             font-weight: 600;
             margin-bottom: 8px;
             color: #2c3e50;
+            font-size: 16px;
         }
         
         .popup-info {
@@ -366,20 +410,56 @@
             margin-bottom: 4px;
         }
         
+        .status-message {
+            position: absolute;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #3498db;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        
+        .status-message.error {
+            background: #e74c3c;
+        }
+        
+        .status-message.success {
+            background: #27ae60;
+        }
+        
+        .marine-info {
+            background: #ecf0f1;
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 8px;
+            font-size: 12px;
+        }
+        
         @media (max-width: 480px) {
             .controls-wrapper {
                 top: 60px;
                 right: 5px;
             }
             
+            .file-input-wrapper {
+                top: 60px;
+                left: 5px;
+            }
+            
             .controls {
-                min-width: 120px;
-                padding: 8px;
+                min-width: 140px;
+                padding: 10px;
             }
             
             .toggle-control label {
                 font-size: 13px;
-                min-width: 70px;
+                min-width: 80px;
             }
             
             .waypoint-item {
@@ -409,6 +489,14 @@
                 padding: 6px 12px;
                 font-size: 13px;
             }
+            
+            .nav-button {
+                font-size: 12px;
+            }
+            
+            .nav-icon {
+                font-size: 16px;
+            }
         }
     </style>
 </head>
@@ -423,11 +511,19 @@
     <div id="list-view">
         <div class="search-container">
             <div class="search-input-wrapper">
-                <input type="text" class="search-input" id="search-input" placeholder="Search waypoints by name...">
+                <input type="text" class="search-input" id="search-input" placeholder="Search fishing spots by name...">
                 <button class="search-clear" id="search-clear" title="Clear search">✕</button>
             </div>
         </div>
         <div id="waypoint-list"></div>
+    </div>
+    
+    <div class="file-input-wrapper" id="file-input-wrapper">
+        <input type="file" id="file-input" class="file-input" accept=".gpx" />
+        <button class="file-input-button" onclick="document.getElementById('file-input').click()">
+            <span>🎣</span>
+            <span>Load GPX</span>
+        </button>
     </div>
     
     <div class="controls-wrapper" id="controls-wrapper">
@@ -447,10 +543,13 @@
                     <div class="toggle-slider"></div>
                 </div>
             </div>
+
         </div>
     </div>
     
     <button class="clear-filter" id="clear-filter">Clear Filter</button>
+    
+    <div class="status-message" id="status-message"></div>
     
     <nav class="bottom-nav">
         <button class="nav-button active" id="nav-map">
@@ -460,6 +559,10 @@
         <button class="nav-button" id="nav-list">
             <span class="nav-icon">📋</span>
             <span>LIST</span>
+        </button>
+        <button class="nav-button" id="nav-load">
+            <span class="nav-icon">🎣</span>
+            <span>LOAD</span>
         </button>
     </nav>
     
@@ -484,7 +587,9 @@
         // Initialize the application
         async function init() {
             try {
-                // Initialize map
+                console.log('Initializing map...');
+                
+                // Initialize map with Cape Town area as default
                 map = L.map('map').setView([-34.5, 19.3], 10);
                 
                 // Add tile layer
@@ -492,6 +597,8 @@
                     attribution: '© OpenStreetMap contributors',
                     maxZoom: 19
                 }).addTo(map);
+                
+                console.log('Map initialized successfully');
                 
                 // Initialize marker cluster group
                 markerClusterGroup = L.markerClusterGroup({
@@ -501,8 +608,14 @@
                     zoomToBoundsOnClick: true
                 });
                 
-                // Load GPX file
-                await loadGPXFile('paste.txt');
+                // Try to load default GPX file
+                try {
+                    await loadGPXFile('waypoints.gpx');
+                    console.log('Default GPX loaded successfully');
+                } catch (error) {
+                    console.log('Default GPX file not found:', error.message);
+                    showStatusMessage('Ready! Load a GPX file to view your fishing spots 🎣', 'info');
+                }
                 
                 // Setup event listeners
                 setupEventListeners();
@@ -513,20 +626,37 @@
                 // Hide loading indicator
                 document.getElementById('loading').style.display = 'none';
                 
+                console.log('Initialization complete');
+                
             } catch (error) {
                 console.error('Initialization error:', error);
-                document.getElementById('loading').innerHTML = 
-                    '<div style="color: #e74c3c;">Error loading waypoints. Please try again.</div>';
+                showStatusMessage('Error initializing map. Please refresh and try again.', 'error');
+                document.getElementById('loading').style.display = 'none';
             }
         }
         
         // Parse GPX file
-        async function loadGPXFile(filename) {
+        async function loadGPXFile(filename, fileContent = null) {
             try {
-                const response = await fetch(filename);
-                const text = await response.text();
+                let text;
+                if (fileContent) {
+                    text = fileContent;
+                } else {
+                    const response = await fetch(filename);
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch ${filename}: ${response.status}`);
+                    }
+                    text = await response.text();
+                }
+                
                 const parser = new DOMParser();
                 const gpx = parser.parseFromString(text, 'application/xml');
+                
+                // Check for parsing errors
+                const parseError = gpx.querySelector('parsererror');
+                if (parseError) {
+                    throw new Error('Invalid GPX file format');
+                }
                 
                 // Extract waypoints
                 const wpts = gpx.querySelectorAll('wpt');
@@ -535,29 +665,51 @@
                     const lon = parseFloat(wpt.getAttribute('lon'));
                     const name = wpt.querySelector('name')?.textContent || 'Unnamed';
                     const desc = wpt.querySelector('desc')?.textContent || '';
+                    const cmt = wpt.querySelector('cmt')?.textContent || '';
                     const ele = wpt.querySelector('ele')?.textContent || '';
                     const time = wpt.querySelector('time')?.textContent || '';
+                    const sym = wpt.querySelector('sym')?.textContent || 'Waypoint';
                     
-                    return { lat, lon, name, desc, ele, time };
+                    return { lat, lon, name, desc, cmt, ele, time, sym };
                 });
+                
+                if (waypoints.length === 0) {
+                    throw new Error('No waypoints found in GPX file');
+                }
+                
+                console.log(`Loaded ${waypoints.length} waypoints`);
                 
                 // Create markers and display
                 createMarkers();
                 updateMapBounds();
                 renderList();
                 
+                showStatusMessage(`🎣 Loaded ${waypoints.length} fishing spots successfully!`, 'success');
+                
             } catch (error) {
+                console.error('Error loading GPX:', error);
                 throw new Error('Failed to load GPX file: ' + error.message);
             }
         }
         
         // Create markers for waypoints
         function createMarkers() {
+            // Clear existing markers
+            markers.forEach(marker => marker.remove());
             markers = [];
             markerClusterGroup.clearLayers();
             
             waypoints.forEach((waypoint, index) => {
-                const marker = L.marker([waypoint.lat, waypoint.lon]);
+                // Create custom fishing spot marker
+                const fishingIcon = L.divIcon({
+                    className: 'fishing-marker',
+                    html: getFishingMarkerHtml(waypoint),
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15],
+                    popupAnchor: [0, -15]
+                });
+                
+                const marker = L.marker([waypoint.lat, waypoint.lon], { icon: fishingIcon });
                 
                 // Create popup content
                 const popupContent = createPopupContent(waypoint);
@@ -574,7 +726,7 @@
                 }
             });
             
-            if (isClusteringEnabled) {
+            if (isClusteringEnabled && markers.length > 0) {
                 map.addLayer(markerClusterGroup);
             }
             
@@ -584,29 +736,84 @@
             }
         }
         
+        // Get fishing marker HTML
+        function getFishingMarkerHtml(waypoint) {
+            let emoji = '🎣'; // Default fishing icon
+            
+            // Customize based on symbol or name
+            if (waypoint.sym === 'Geocache Found') {
+                emoji = '✅';
+            } else if (waypoint.name.toLowerCase().includes('boat')) {
+                emoji = '⛵';
+            } else if (waypoint.name.toLowerCase().includes('reef') || waypoint.name.toLowerCase().includes('wreck')) {
+                emoji = '🪨';
+            } else if (waypoint.name.toLowerCase().includes('deep')) {
+                emoji = '🌊';
+            }
+            
+            return `<div style="
+                background: #3498db;
+                border: 3px solid white;
+                border-radius: 50%;
+                width: 30px;
+                height: 30px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 16px;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            ">${emoji}</div>`;
+        }
+        
         // Create popup content
         function createPopupContent(waypoint) {
             let content = `<div class="popup-content">
-                <div class="popup-title">${waypoint.name}</div>
+                <div class="popup-title">🎣 ${waypoint.name}</div>
                 <div class="popup-info">`;
-            
-            if (waypoint.ele) {
-                content += `<div><strong>Elevation:</strong> ${parseFloat(waypoint.ele).toFixed(2)}m</div>`;
-            }
             
             content += `<div><strong>Coordinates:</strong><br>${waypoint.lat.toFixed(6)}, ${waypoint.lon.toFixed(6)}</div>`;
             
-            if (waypoint.time) {
-                const date = new Date(waypoint.time);
-                content += `<div><strong>Time:</strong> ${date.toLocaleDateString()}</div>`;
+            if (waypoint.ele) {
+                const depth = parseFloat(waypoint.ele);
+                if (depth < 0) {
+                    content += `<div><strong>Depth:</strong> ${Math.abs(depth).toFixed(1)}m below surface</div>`;
+                } else {
+                    content += `<div><strong>Elevation:</strong> ${depth.toFixed(1)}m above sea level</div>`;
+                }
             }
             
-            if (waypoint.desc && waypoint.desc !== waypoint.name) {
-                content += `<div><strong>Description:</strong><br>${waypoint.desc}</div>`;
+            if (waypoint.time) {
+                const date = new Date(waypoint.time);
+                if (!isNaN(date.getTime())) {
+                    content += `<div><strong>Logged:</strong> ${date.toLocaleDateString()} ${date.toLocaleTimeString()}</div>`;
+                }
+            }
+            
+            if (waypoint.desc && waypoint.desc !== waypoint.name && waypoint.desc !== waypoint.cmt) {
+                // Check if it's marine data
+                if (waypoint.desc.includes('Marine Data')) {
+                    content += `<div class="marine-info">${waypoint.desc}</div>`;
+                } else {
+                    content += `<div><strong>Notes:</strong><br>${waypoint.desc}</div>`;
+                }
+            } else if (waypoint.cmt && waypoint.cmt !== waypoint.name) {
+                content += `<div><strong>Comment:</strong><br>${waypoint.cmt}</div>`;
             }
             
             content += '</div></div>';
             return content;
+        }
+        
+        // Show status message
+        function showStatusMessage(message, type = 'info') {
+            const statusEl = document.getElementById('status-message');
+            statusEl.textContent = message;
+            statusEl.className = `status-message ${type}`;
+            statusEl.style.display = 'block';
+            
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, 4000);
         }
         
         // Update map bounds to fit all waypoints
@@ -621,11 +828,12 @@
         function renderList(filter = '') {
             const listContainer = document.getElementById('waypoint-list');
             const filteredWaypoints = filter 
-                ? waypoints.filter(w => w.name.toLowerCase().includes(filter.toLowerCase()))
+                ? waypoints.filter(w => w.name.toLowerCase().includes(filter.toLowerCase()) ||
+                                     (w.desc && w.desc.toLowerCase().includes(filter.toLowerCase())))
                 : waypoints;
             
             if (filteredWaypoints.length === 0) {
-                listContainer.innerHTML = '<div class="no-results">No waypoints found</div>';
+                listContainer.innerHTML = '<div class="no-results">No fishing spots found</div>';
                 return;
             }
             
@@ -634,10 +842,10 @@
                 return `
                     <div class="waypoint-item" data-index="${originalIndex}">
                         <div class="waypoint-info">
-                            <div class="waypoint-name">${waypoint.name}</div>
+                            <div class="waypoint-name">🎣 ${waypoint.name}</div>
                             <div class="waypoint-coords">${waypoint.lat.toFixed(6)}, ${waypoint.lon.toFixed(6)}</div>
                             ${waypoint.desc && waypoint.desc !== waypoint.name ? 
-                                `<div class="waypoint-desc">${waypoint.desc}</div>` : ''}
+                                `<div class="waypoint-desc">${waypoint.desc.substring(0, 100)}${waypoint.desc.length > 100 ? '...' : ''}</div>` : ''}
                         </div>
                         <button class="waypoint-item-button" data-index="${originalIndex}">
                             <span class="waypoint-item-button-text">Show on map</span>
@@ -679,54 +887,29 @@
                 map.removeLayer(heatmapLayer);
             }
             
-            if (isHeatmapEnabled) {
+            if (isHeatmapEnabled && waypoints.length > 0) {
                 const filteredWaypoints = waypoints
-                    .filter(w => !currentFilter || w.name.toLowerCase().includes(currentFilter.toLowerCase()));
-                
-                // Calculate intensity based on waypoint density
-                const bounds = map.getBounds();
-                const visibleWaypoints = filteredWaypoints.filter(w => 
-                    bounds.contains([w.lat, w.lon])
-                );
-                
-                // Adjust intensity based on zoom level and visible waypoints
-                const zoomLevel = map.getZoom();
-                const baseIntensity = Math.min(1, 0.3 + (visibleWaypoints.length / 20));
+                    .filter(w => !currentFilter || 
+                        w.name.toLowerCase().includes(currentFilter.toLowerCase()) ||
+                        (w.desc && w.desc.toLowerCase().includes(currentFilter.toLowerCase())));
                 
                 const heatData = filteredWaypoints.map(w => {
-                    // Add some random variation to make heat spots more visible
-                    const intensity = baseIntensity + (Math.random() * 0.3);
+                    const intensity = 0.5 + (Math.random() * 0.5);
                     return [w.lat, w.lon, intensity];
                 });
                 
-                // Add additional points around each waypoint for better visualization
-                const enhancedData = [];
-                heatData.forEach(point => {
-                    enhancedData.push(point);
-                    // Add surrounding points for density
-                    for (let i = 0; i < 3; i++) {
-                        const offsetLat = (Math.random() - 0.5) * 0.002;
-                        const offsetLon = (Math.random() - 0.5) * 0.002;
-                        enhancedData.push([
-                            point[0] + offsetLat,
-                            point[1] + offsetLon,
-                            point[2] * 0.5
-                        ]);
-                    }
-                });
-                
-                heatmapLayer = L.heatLayer(enhancedData, {
-                    radius: Math.max(15, 40 - zoomLevel * 2),
-                    blur: Math.max(10, 25 - zoomLevel),
+                heatmapLayer = L.heatLayer(heatData, {
+                    radius: 25,
+                    blur: 15,
                     maxZoom: 17,
                     max: 1.0,
                     minOpacity: 0.4,
                     gradient: {
                         0.0: 'rgba(0, 0, 255, 0)',
                         0.2: 'rgba(0, 0, 255, 0.5)',
-                        0.4: 'rgba(0, 255, 0, 0.7)',
-                        0.6: 'rgba(255, 255, 0, 0.8)',
-                        0.8: 'rgba(255, 128, 0, 0.9)',
+                        0.4: 'rgba(0, 255, 255, 0.7)',
+                        0.6: 'rgba(0, 255, 0, 0.8)',
+                        0.8: 'rgba(255, 255, 0, 0.9)',
                         1.0: 'rgba(255, 0, 0, 1)'
                     }
                 }).addTo(map);
@@ -735,16 +918,18 @@
         
         // Apply filter to map
         function applyFilterToMap(filter) {
-            // Clear existing markers
             if (isClusteringEnabled) {
                 markerClusterGroup.clearLayers();
             } else {
                 markers.forEach(marker => marker.remove());
             }
             
-            // Add filtered markers
             waypoints.forEach((waypoint, index) => {
-                if (!filter || waypoint.name.toLowerCase().includes(filter.toLowerCase())) {
+                const matchesFilter = !filter || 
+                    waypoint.name.toLowerCase().includes(filter.toLowerCase()) ||
+                    (waypoint.desc && waypoint.desc.toLowerCase().includes(filter.toLowerCase()));
+                    
+                if (matchesFilter) {
                     if (isClusteringEnabled) {
                         markerClusterGroup.addLayer(markers[index]);
                     } else {
@@ -753,12 +938,10 @@
                 }
             });
             
-            // Update heatmap
             if (isHeatmapEnabled) {
                 updateHeatmap();
             }
             
-            // Show/hide clear filter button
             const clearButton = document.getElementById('clear-filter');
             if (filter && document.getElementById('map').style.display !== 'none') {
                 clearButton.style.display = 'block';
@@ -773,15 +956,15 @@
             document.getElementById('list-view').style.display = 'none';
             document.getElementById('nav-map').classList.add('active');
             document.getElementById('nav-list').classList.remove('active');
+            document.getElementById('nav-load').classList.remove('active');
             document.getElementById('controls-wrapper').classList.add('show');
+            document.getElementById('file-input-wrapper').classList.remove('show');
             
-            // Show clear filter if there's an active filter
             if (currentFilter) {
                 document.getElementById('clear-filter').style.display = 'block';
             }
             
             map.invalidateSize();
-            // Update heatmap when switching to map view
             if (isHeatmapEnabled) {
                 updateHeatmap();
             }
@@ -793,10 +976,24 @@
             document.getElementById('list-view').style.display = 'block';
             document.getElementById('nav-map').classList.remove('active');
             document.getElementById('nav-list').classList.add('active');
+            document.getElementById('nav-load').classList.remove('active');
             document.getElementById('controls-wrapper').classList.remove('show');
-            
-            // Hide clear filter on list view
+            document.getElementById('file-input-wrapper').classList.remove('show');
             document.getElementById('clear-filter').style.display = 'none';
+        }
+        
+        // Show load view
+        function showLoadView() {
+            document.getElementById('map').style.display = 'block';
+            document.getElementById('list-view').style.display = 'none';
+            document.getElementById('nav-map').classList.remove('active');
+            document.getElementById('nav-list').classList.remove('active');
+            document.getElementById('nav-load').classList.add('active');
+            document.getElementById('controls-wrapper').classList.remove('show');
+            document.getElementById('file-input-wrapper').classList.add('show');
+            document.getElementById('clear-filter').style.display = 'none';
+            
+            map.invalidateSize();
         }
         
         // Toggle clustering
@@ -805,22 +1002,26 @@
             document.getElementById('toggle-clustering').classList.toggle('active');
             
             if (isClusteringEnabled) {
-                // Remove individual markers
                 markers.forEach(marker => marker.remove());
-                // Add cluster group
                 markerClusterGroup.clearLayers();
                 markers.forEach(marker => {
-                    if (!currentFilter || waypoints[marker.waypointIndex].name.toLowerCase().includes(currentFilter.toLowerCase())) {
+                    const waypoint = waypoints[marker.waypointIndex];
+                    const matchesFilter = !currentFilter || 
+                        waypoint.name.toLowerCase().includes(currentFilter.toLowerCase()) ||
+                        (waypoint.desc && waypoint.desc.toLowerCase().includes(currentFilter.toLowerCase()));
+                    if (matchesFilter) {
                         markerClusterGroup.addLayer(marker);
                     }
                 });
                 map.addLayer(markerClusterGroup);
             } else {
-                // Remove cluster group
                 map.removeLayer(markerClusterGroup);
-                // Add individual markers
                 markers.forEach((marker, index) => {
-                    if (!currentFilter || waypoints[index].name.toLowerCase().includes(currentFilter.toLowerCase())) {
+                    const waypoint = waypoints[index];
+                    const matchesFilter = !currentFilter || 
+                        waypoint.name.toLowerCase().includes(currentFilter.toLowerCase()) ||
+                        (waypoint.desc && waypoint.desc.toLowerCase().includes(currentFilter.toLowerCase()));
+                    if (matchesFilter) {
                         marker.addTo(map);
                     }
                 });
@@ -834,11 +1035,49 @@
             updateHeatmap();
         }
         
+        // Handle file selection
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            if (!file.name.toLowerCase().endsWith('.gpx')) {
+                showStatusMessage('Please select a GPX file', 'error');
+                return;
+            }
+            
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('loading').innerHTML = `
+                <div class="loading-spinner"></div>
+                <div>Loading ${file.name}...</div>
+            `;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    loadGPXFile(file.name, e.target.result).then(() => {
+                        showMapView();
+                        document.getElementById('loading').style.display = 'none';
+                    }).catch(error => {
+                        showStatusMessage(error.message, 'error');
+                        document.getElementById('loading').style.display = 'none';
+                    });
+                } catch (error) {
+                    showStatusMessage('Error reading file: ' + error.message, 'error');
+                    document.getElementById('loading').style.display = 'none';
+                }
+            };
+            reader.readAsText(file);
+        }
+        
         // Setup event listeners
         function setupEventListeners() {
             // Navigation buttons
             document.getElementById('nav-map').addEventListener('click', showMapView);
             document.getElementById('nav-list').addEventListener('click', showListView);
+            document.getElementById('nav-load').addEventListener('click', showLoadView);
+            
+            // File input
+            document.getElementById('file-input').addEventListener('change', handleFileSelect);
             
             // Controls toggle
             document.getElementById('controls-toggle').addEventListener('click', function() {
@@ -866,7 +1105,6 @@
                 renderList(currentFilter);
                 applyFilterToMap(currentFilter);
                 
-                // Show/hide clear button in search field
                 document.getElementById('search-clear').style.display = 
                     currentFilter.length > 0 ? 'block' : 'none';
             });
@@ -881,7 +1119,6 @@
                 this.style.display = 'none';
             });
             
-            // Search clear button (X in search field)
             document.getElementById('search-clear').addEventListener('click', function() {
                 currentFilter = '';
                 document.getElementById('search-input').value = '';
@@ -890,7 +1127,7 @@
                 this.style.display = 'none';
             });
             
-            // Update heatmap on map move/zoom
+            // Map events
             map.on('moveend zoomend', function() {
                 if (isHeatmapEnabled) {
                     updateHeatmap();
