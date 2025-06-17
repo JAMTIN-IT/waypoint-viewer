@@ -627,7 +627,7 @@ body {
     animation: pulse-location-button 1.5s infinite ease-in-out;
 }
 
-/* #map-orientation-button CSS rules removed */
+/* #map-orientation-button CSS rules were here */
 
 
 @keyframes pulse-location-button {
@@ -691,7 +691,7 @@ body {
         font-size: 13px;
     }
 
-    /* .toggle.disabled-by-map-rotation rules removed */
+    /* .toggle.disabled-by-map-rotation rules were here */
 
     .waypoint-item {
         margin: 10px 8px;
@@ -777,7 +777,7 @@ body {
         height: 20px;
     }
 
-    /* #map-orientation-button mobile CSS rules removed */
+    /* #map-orientation-button mobile CSS rules were here */
 
     #accuracy-display {
         bottom: calc(60px + 5px);
