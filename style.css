@@ -29,6 +29,9 @@
 
 
     --border-color: #dee2e6;
+    --border-radius-md: 6px; /* Standard border radius */
+    --border-radius-lg: 8px; /* Larger border radius */
+
     --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
     --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
     --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
@@ -55,6 +58,10 @@ body {
     position: relative;
     background-color: var(--light-bg);
     color: var(--dark-text);
+}
+
+.hidden-by-default {
+    display: none;
 }
 
 #map {
@@ -100,37 +107,33 @@ body {
     justify-content: center;
     gap: 4px;
     padding: 0 5px;
-    border-top: 3px solid transparent; /* Placeholder for consistent height */
+    border-top: 3px solid transparent;
 }
 
 .nav-button:hover {
     background-color: rgba(255,255,255,0.08);
     transform: translateY(-1px);
 }
-.nav-button:active { /* This is for momentary press */
-    background-color: rgba(255,255,255,0.12); /* Slightly more feedback on press */
+.nav-button:active {
+    background-color: rgba(255,255,255,0.12);
     transform: translateY(0px);
 }
 
-/* Active state for actual VIEW selection (Map or List) */
 #nav-map.active,
 #nav-list.active {
     background-color: var(--primary-active-nav-bg-color);
     color: var(--white-color);
-    border-top: 3px solid var(--primary-color); /* Highlight for active view */
+    border-top: 3px solid var(--primary-color);
     transform: none;
 }
 #nav-map.active:hover,
 #nav-list.active:hover {
-    background-color: var(--primary-active-nav-bg-color); /* Keep bg same as active on hover */
+    background-color: var(--primary-active-nav-bg-color);
 }
 
-/* #nav-load should not have a persistent 'active' view style */
-/* Its :active pseudo-class handles press feedback */
-/* If JS adds .active class to #nav-load, this ensures it's not styled as a view */
 #nav-load.active {
-    background-color: rgba(255,255,255,0.08); /* Similar to hover, or its :active state */
-    border-top-color: transparent; /* Important: no active view border */
+    background-color: rgba(255,255,255,0.08);
+    border-top-color: transparent;
 }
 
 
@@ -160,13 +163,8 @@ body {
 }
 
 .file-input-wrapper {
-    /* position: absolute; top: 10px; left: 10px; z-index: 1000; */
-    /* background: var(--white-color); border-radius: 8px; */
-    /* box-shadow: var(--shadow-md); padding: 15px; */
-    display: none !important; /* Always hidden */
+    display: none !important;
 }
-
-/* .file-input-wrapper.show { display: block; } */ /* No longer needed */
 
 
 .file-input {
@@ -178,7 +176,7 @@ body {
     color: var(--white-color);
     border: none;
     padding: 8px 16px;
-    border-radius: 6px;
+    border-radius: var(--border-radius-md);
     cursor: pointer;
     font-size: 14px;
     font-weight: 500;
@@ -209,7 +207,7 @@ body {
     width: 44px;
     height: 44px;
     background: var(--white-color);
-    border-radius: 8px;
+    border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-md);
     display: flex;
     align-items: center;
@@ -245,13 +243,14 @@ body {
     right: 0;
     background: var(--white-color);
     padding: 15px;
-    border-radius: 8px;
+    border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-lg);
     border: 1px solid var(--border-color);
     display: none;
     flex-direction: column;
     gap: 10px;
     min-width: 180px;
+    z-index: 1005;
 }
 
 .controls.expanded {
@@ -373,7 +372,7 @@ body {
     background: var(--white-color);
     margin: 12px 10px;
     padding: 15px;
-    border-radius: 8px;
+    border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-sm);
     transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, background-color 0.2s ease-in-out;
     display: flex;
@@ -502,7 +501,7 @@ body {
     z-index: 2000;
     background: rgba(255,255,255,0.95);
     padding: 30px;
-    border-radius: 10px;
+    border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-lg);
 }
 
@@ -576,11 +575,64 @@ body {
 .marine-info {
     background: #e9ecef;
     padding: 8px;
-    border-radius: 4px;
+    border-radius: var(--border-radius-md);
     margin-top: 8px;
     font-size: 12px;
     color: var(--medium-text);
     border: 1px solid var(--border-color);
+}
+
+.map-floating-button {
+    position: absolute;
+    z-index: 1000;
+    background-color: var(--white-color);
+    color: var(--dark-text);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-md);
+    padding: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out, transform 0.1s ease-in-out, color 0.2s ease-in-out;
+}
+
+.map-floating-button:hover {
+    background-color: var(--light-bg-hover);
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-1px);
+}
+
+.map-floating-button:active {
+    background-color: var(--border-color);
+    transform: scale(0.95);
+    box-shadow: var(--shadow-sm);
+}
+
+#my-location-button {
+    top: 70px;
+    left: 15px;
+    width: 44px;
+    height: 44px;
+    display: none;
+}
+
+#my-location-button.active-locating {
+    color: var(--primary-color);
+    animation: pulse-location-button 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse-location-button {
+    0% {
+        box-shadow: 0 0 0 0 rgba(var(--primary-rgb), 0.4), var(--shadow-md); /* Keep original shadow too */
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(var(--primary-rgb), 0), var(--shadow-md);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(var(--primary-rgb), 0), var(--shadow-md);
+    }
 }
 
 
@@ -590,14 +642,12 @@ body {
         right: 15px;
         width: 44px;
         height: 44px;
-        z-index: 1001;
+        z-index: 1010;
     }
     .controls-toggle svg {
         width: 20px;
         height: 20px;
     }
-
-    /* .file-input-wrapper is display: none !important */
 
     .controls {
         min-width: 200px;
@@ -683,5 +733,16 @@ body {
         left: 0;
         transform: none;
         box-sizing: border-box;
+    }
+
+    #my-location-button {
+        top: 65px;
+        left: 10px;
+        width: 40px;
+        height: 40px;
+    }
+    #my-location-button svg {
+        width: 20px;
+        height: 20px;
     }
 }
