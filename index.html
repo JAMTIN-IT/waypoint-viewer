@@ -32,7 +32,7 @@
             <circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle><line x1="12" y1="2" x2="12" y2="5"></line><line x1="12" y1="19" x2="12" y2="22"></line><line x1="2" y1="12" x2="5" y2="12"></line><line x1="19" y1="12" x2="22" y2="12"></line>
         </svg>
     </button>
-    <button id="map-orientation-button" class="map-floating-button" title="Toggle map orientation (North Up)" style="display: none;"></button>
+    <!-- map-orientation-button removed from here -->
     <div id="accuracy-display" class="map-fixed-overlay">Accuracy: ---</div>
     
     <div id="list-view">
@@ -104,8 +104,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
     <!-- Leaflet Heat JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
-    <!-- Leaflet.Map.Rotate Plugin -->
-    <script src="https://unpkg.com/leaflet-rotate/dist/leaflet.rotate.js"></script>
+    <!-- Leaflet.Map.Rotate Plugin Removed -->
     
     <script>
         // Global variables
@@ -127,24 +126,18 @@
 
         let isOrientationEnabled = false; // For device heading on marker
         let currentHeading = 0;
-        let mapOrientationMode = 'northUp'; // 'northUp', 'headingUp'
+        // mapOrientationMode and related icon SVGs removed
 
         const arrowIconSvg = `<svg viewBox="0 0 24 24" width="24" height="24" style="transform-origin: center; fill: var(--primary-color); stroke: var(--white-color, #fff); stroke-width: 1px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2)); pointer-events: none;"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 2.99l.71-.71z"></path></svg>`;
         const userLocationArrowIcon = L.divIcon({ className: 'user-location-icon', html: arrowIconSvg, iconSize: [24, 24], iconAnchor: [12, 12] });
 
-        const dotIconSvgForMapRotate = `<div style="background-color: var(--primary-color); width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--white-color, #fff); box-shadow: var(--shadow-md); transform-origin: center;"></div>`;
-        const userLocationDotIconForMapRotate = L.divIcon({ className: 'user-location-icon-dot', html: dotIconSvgForMapRotate, iconSize: [20, 20], iconAnchor: [10, 10]});
-
-        const compassNorthUpIconSvg = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L12 6"></path><path d="M12 18L12 22"></path><path d="M18 12L22 12"></path><path d="M2 12L6 12"></path><circle cx="12" cy="12" r="7"></circle><polygon points="12 2 10 6 14 6 12 2" fill="currentColor"></polygon></svg>`;
-        const deviceHeadingUpIconSvg = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L12 22M5 9l7-7 7 7"/></svg>`;
+        // dotIconSvgForMapRotate and userLocationDotIconForMapRotate removed
         
         // Initialize the application
         async function init() {
             try {
                 console.log('Initializing map...');
-                map = L.map('map', {
-                    rotate: true // Enable map rotation
-                }).setView([-34.5, 19.3], 10);
+                map = L.map('map').setView([-34.5, 19.3], 10); // rotate: true removed
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     attribution: '© OpenStreetMap contributors', maxZoom: 19
                 }).addTo(map);
@@ -326,7 +319,7 @@
             document.getElementById('nav-load').classList.remove('active');
             document.getElementById('controls-wrapper').classList.add('show');
             document.getElementById('my-location-button').style.display = 'flex';
-            document.getElementById('map-orientation-button').style.display = 'flex';
+            // document.getElementById('map-orientation-button').style.display = 'flex'; // Removed
             if (currentFilter) document.getElementById('clear-filter').style.display = 'block';
             map.invalidateSize();
             if (isHeatmapEnabled) updateHeatmap();
@@ -340,7 +333,7 @@
             document.getElementById('nav-load').classList.remove('active');
             document.getElementById('controls-wrapper').classList.remove('show');
             document.getElementById('my-location-button').style.display = 'none';
-            document.getElementById('map-orientation-button').style.display = 'none';
+            // document.getElementById('map-orientation-button').style.display = 'none'; // Removed
             document.getElementById('clear-filter').style.display = 'none';
         }
         
@@ -354,13 +347,13 @@
             isHeatmapEnabled = !isHeatmapEnabled;
             document.getElementById('toggle-heatmap').classList.toggle('active', isHeatmapEnabled);
             if (isHeatmapEnabled) {
-                if (userLocationMarker) userLocationMarker.setOpacity(0.5); // Make user marker semi-transparent
-                markers.forEach(m => m.setOpacity(0)); // Hide individual markers
+                if (userLocationMarker) userLocationMarker.setOpacity(0.5);
+                markers.forEach(m => m.setOpacity(0));
                 updateHeatmap();
             } else {
                 if (heatmapLayer) map.removeLayer(heatmapLayer);
-                if (userLocationMarker) userLocationMarker.setOpacity(1); // Restore user marker opacity
-                markers.forEach(m => m.setOpacity(1)); // Restore individual markers
+                if (userLocationMarker) userLocationMarker.setOpacity(1);
+                markers.forEach(m => m.setOpacity(1));
             }
         }
         
@@ -389,30 +382,21 @@
                 accuracyElement.classList.add('visible');
             }
 
-            let currentIconToUse = (mapOrientationMode === 'headingUp') ? userLocationDotIconForMapRotate : userLocationArrowIcon;
-
+            // Always use arrow icon now
             if (!userLocationMarker) {
-                userLocationMarker = L.marker([latitude, longitude], { icon: currentIconToUse }).addTo(map);
+                userLocationMarker = L.marker([latitude, longitude], { icon: userLocationArrowIcon }).addTo(map);
             } else {
-                userLocationMarker.setIcon(currentIconToUse); // Ensure icon is correct for mode
+                userLocationMarker.setIcon(userLocationArrowIcon); // Ensure it's arrow
                 userLocationMarker.setLatLng([latitude, longitude]);
             }
 
-            // Apply rotation based on mode and enabled features
-            if (mapOrientationMode === 'headingUp') {
-                // Dot icon is used, ensure it's not rotated by device orientation
-                if (userLocationMarker.getElement() && userLocationMarker.getElement().firstChild) {
-                     userLocationMarker.getElement().firstChild.style.transform = 'rotate(0deg)';
-                }
-            } else { // mapOrientationMode === 'northUp'
-                if (isOrientationEnabled) { // Device heading for marker is enabled
-                    if (userLocationMarker.getElement() && userLocationMarker.getElement().firstChild) {
-                        userLocationMarker.getElement().firstChild.style.transform = `rotate(${currentHeading}deg)`;
-                    }
-                } else { // Device heading for marker is disabled
-                    if (userLocationMarker.getElement() && userLocationMarker.getElement().firstChild) {
-                        userLocationMarker.getElement().firstChild.style.transform = 'rotate(0deg)';
-                    }
+            // Apply rotation based on device heading toggle state
+            const markerElement = userLocationMarker.getElement();
+            if (markerElement && markerElement.firstChild) {
+                if (isOrientationEnabled) {
+                    markerElement.firstChild.style.transform = `rotate(${currentHeading}deg)`;
+                } else {
+                    markerElement.firstChild.style.transform = 'rotate(0deg)';
                 }
             }
 
@@ -425,39 +409,21 @@
         }
 
         function handleOrientation(event) {
-            if (!userLocationMarker && mapOrientationMode !== 'headingUp') return; // No marker to rotate & map not rotating
+            if (!isOrientationEnabled || !userLocationMarker) return; // Only act if marker exists and feature enabled
 
             let heading = event.webkitCompassHeading || (event.absolute === true && event.alpha !== null ? event.alpha : null);
 
             if (heading !== null) {
-                currentHeading = heading; // Always store the latest heading
-
-                if (mapOrientationMode === 'headingUp') {
-                    if (map && typeof map.setBearing === 'function') {
-                        map.setBearing(heading);
-                    }
-                    // Ensure dot icon itself is not rotated by device orientation
-                    if (userLocationMarker && userLocationMarker.getElement() && userLocationMarker.getElement().firstChild) {
-                         userLocationMarker.getElement().firstChild.style.transform = 'rotate(0deg)';
-                    }
-                } else { // mapOrientationMode === 'northUp'
-                    if (isOrientationEnabled && userLocationMarker) { // Only rotate marker if its own heading toggle is on
-                        const iconElement = userLocationMarker.getElement();
-                        if (iconElement && iconElement.firstChild) {
-                            iconElement.firstChild.style.transform = `rotate(${heading}deg)`;
-                        }
-                    }
+                currentHeading = heading;
+                const markerElement = userLocationMarker.getElement();
+                if (markerElement && markerElement.firstChild) {
+                    markerElement.firstChild.style.transform = `rotate(${heading}deg)`;
                 }
             }
         }
 
         function toggleOrientation() { // For device heading on marker
-            if (mapOrientationMode === 'headingUp') {
-                showStatusMessage("Marker heading N/A when map rotates.", 'info');
-                document.getElementById('toggle-orientation').classList.remove('active'); // Ensure it's visually off
-                isOrientationEnabled = false; // Ensure state is off
-                return;
-            }
+            // mapOrientationMode related checks removed
             isOrientationEnabled = !isOrientationEnabled;
             document.getElementById('toggle-orientation').classList.toggle('active', isOrientationEnabled);
 
@@ -487,7 +453,7 @@
                 window.removeEventListener('deviceorientationabsolute', handleOrientation, true);
                 window.removeEventListener('deviceorientation', handleOrientation, true);
                 showStatusMessage('Marker heading disabled.', 'info');
-                if (userLocationMarker && mapOrientationMode === 'northUp') { // Only reset rotation if map is North Up
+                if (userLocationMarker) {
                     const el = userLocationMarker.getElement(); if (el && el.firstChild) el.firstChild.style.transform = 'rotate(0deg)';
                 }
                 currentHeading = 0;
@@ -545,53 +511,7 @@
             }
         }
 
-        // --- Map Orientation Functions ---
-        function updateMapOrientationButtonIcon() {
-            const button = document.getElementById('map-orientation-button');
-            if (!button) return;
-            if (mapOrientationMode === 'northUp') {
-                button.innerHTML = compassNorthUpIconSvg;
-                button.title = "Toggle map orientation (Current: North Up)";
-            } else if (mapOrientationMode === 'headingUp') {
-                button.innerHTML = deviceHeadingUpIconSvg;
-                button.title = "Toggle map orientation (Current: Device Heading Up)";
-            }
-        }
-
-        function toggleMapOrientation() {
-            const markerHeadingToggle = document.getElementById('toggle-orientation');
-            if (mapOrientationMode === 'northUp') {
-                mapOrientationMode = 'headingUp';
-                showStatusMessage("Map: Device Heading Up", "info");
-                if (map && typeof map.setBearing === 'function') {
-                    // Initial rotation will be set by the next handleOrientation event if device orientation is active
-                    // or use currentHeading if available from marker orientation
-                     map.setBearing(currentHeading);
-                }
-                if (userLocationMarker) userLocationMarker.setIcon(userLocationDotIconForMapRotate);
-                // Disable and visually update device heading toggle for marker
-                markerHeadingToggle.classList.add('disabled-by-map-rotation');
-                markerHeadingToggle.classList.remove('active'); // Ensure it's not visually active
-                // No need to change isOrientationEnabled here, as marker heading is just suppressed
-            } else {
-                mapOrientationMode = 'northUp';
-                showStatusMessage("Map: North Up", "info");
-                if (map && typeof map.setBearing === 'function') map.setBearing(0);
-                if (userLocationMarker) {
-                    userLocationMarker.setIcon(userLocationArrowIcon);
-                    // Re-apply marker rotation if device heading is enabled
-                    if (isOrientationEnabled) {
-                        const iconEl = userLocationMarker.getElement();
-                        if (iconEl && iconEl.firstChild) iconEl.firstChild.style.transform = `rotate(${currentHeading}deg)`;
-                    } else { // Ensure it's not rotated
-                        const iconEl = userLocationMarker.getElement();
-                        if (iconEl && iconEl.firstChild) iconEl.firstChild.style.transform = 'rotate(0deg)';
-                    }
-                }
-                markerHeadingToggle.classList.remove('disabled-by-map-rotation');
-            }
-            updateMapOrientationButtonIcon();
-        }
+        // Map Orientation Functions (updateMapOrientationButtonIcon, toggleMapOrientation) removed.
 
         // Setup event listeners
         function setupEventListeners() {
@@ -601,7 +521,7 @@
             document.getElementById('file-input').addEventListener('change', handleFileSelect);
             document.getElementById('my-location-button').addEventListener('click', toggleUserLocationWatch);
             document.getElementById('toggle-orientation').addEventListener('click', toggleOrientation); // Device heading for marker
-            document.getElementById('map-orientation-button').addEventListener('click', toggleMapOrientation); // Map orientation
+            // map-orientation-button event listener removed.
 
             document.getElementById('controls-toggle').addEventListener('click', function() {
                 const controls = document.getElementById('controls');
@@ -633,7 +553,7 @@
                 const controlsWrapper = document.getElementById('controls-wrapper');
                 const controls = document.getElementById('controls');
                 const toggle = document.getElementById('controls-toggle');
-                const toggleIcon = document.getElementById('toggle-icon'); // Need to get toggleIcon here
+                const toggleIcon = document.getElementById('toggle-icon');
                 const gearIconSVG = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>';
 
                 if (controlsWrapper && !controlsWrapper.contains(e.target) && controls && controls.classList.contains('expanded')) {
@@ -642,7 +562,7 @@
                     if (toggleIcon) toggleIcon.innerHTML = gearIconSVG;
                 }
             });
-            updateMapOrientationButtonIcon();
+            // updateMapOrientationButtonIcon call removed.
         }
         
         window.addEventListener('DOMContentLoaded', init);
