@@ -8,6 +8,12 @@ on:
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+    inputs:
+      branch_to_deploy:
+        description: 'Branch to deploy to GitHub Pages'
+        required: true
+        default: 'main'
+        type: string
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
@@ -31,6 +37,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.branch_to_deploy || github.ref }}
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
