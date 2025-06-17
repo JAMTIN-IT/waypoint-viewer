@@ -32,7 +32,7 @@
             <circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle><line x1="12" y1="2" x2="12" y2="5"></line><line x1="12" y1="19" x2="12" y2="22"></line><line x1="2" y1="12" x2="5" y2="12"></line><line x1="19" y1="12" x2="22" y2="12"></line>
         </svg>
     </button>
-    <!-- map-orientation-button removed from here -->
+    <!-- map-orientation-button removed -->
     <div id="accuracy-display" class="map-fixed-overlay">Accuracy: ---</div>
     
     <div id="list-view">
@@ -392,12 +392,16 @@
 
             // Apply rotation based on device heading toggle state
             const markerElement = userLocationMarker.getElement();
-            if (markerElement && markerElement.firstChild) {
+            if (!markerElement) {
+                console.warn("User location marker element is null even after creation/update.");
+            } else if (markerElement.firstChild) {
                 if (isOrientationEnabled) {
                     markerElement.firstChild.style.transform = `rotate(${currentHeading}deg)`;
                 } else {
                     markerElement.firstChild.style.transform = 'rotate(0deg)';
                 }
+            } else {
+                console.warn("User location marker's firstChild (icon element) is null.");
             }
 
             if (!userLocationAccuracyCircle) {
@@ -477,7 +481,7 @@
                     if (isOrientationEnabled) toggleOrientation();
                     break;
                 case error.POSITION_UNAVAILABLE:
-                    message = "Location information is unavailable.";
+                    message = "Location information is unavailable. Check GPS/connectivity."; // Modified message
                     if (userLocationMarker) { userLocationMarker.remove(); userLocationMarker = null; }
                     if (userLocationAccuracyCircle) { userLocationAccuracyCircle.remove(); userLocationAccuracyCircle = null; }
                     if (isOrientationEnabled) toggleOrientation();
@@ -489,6 +493,7 @@
         }
 
         function toggleUserLocationWatch() {
+            console.log("toggleUserLocationWatch called. Current locationWatchId:", locationWatchId); // New log
             const myLocationButton = document.getElementById('my-location-button');
             if (locationWatchId !== null) {
                 if (isOrientationEnabled) toggleOrientation();
@@ -523,14 +528,25 @@
             document.getElementById('toggle-orientation').addEventListener('click', toggleOrientation); // Device heading for marker
             // map-orientation-button event listener removed.
 
-            document.getElementById('controls-toggle').addEventListener('click', function() {
+            document.getElementById('controls-toggle').addEventListener('click', function(e) { // Added 'e' parameter
+                e.stopPropagation(); // Prevent event from bubbling to document click listener
+
                 const controls = document.getElementById('controls');
                 const toggleIcon = document.getElementById('toggle-icon');
                 const isExpanded = controls.classList.contains('expanded');
+
                 const gearIconSVG = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>';
                 const closeIconSVG = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
-                if (isExpanded) { controls.classList.remove('expanded'); this.classList.remove('expanded'); toggleIcon.innerHTML = gearIconSVG; }
-                else { controls.classList.add('expanded'); this.classList.add('expanded'); toggleIcon.innerHTML = closeIconSVG; }
+
+                if (isExpanded) { // When closing
+                    controls.classList.remove('expanded');
+                    this.classList.remove('expanded');
+                    toggleIcon.innerHTML = gearIconSVG;
+                } else { // When opening
+                    controls.classList.add('expanded');
+                    this.classList.add('expanded');
+                    toggleIcon.innerHTML = closeIconSVG;
+                }
             });
             
             document.getElementById('toggle-clustering').addEventListener('click', toggleClustering);
