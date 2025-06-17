@@ -27,6 +27,17 @@
     </div>
     
     <div id="map"></div>
+    <button id="my-location-button" class="map-floating-button" title="Find my location">
+        <!-- SVG icon for "my location" -->
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <circle cx="12" cy="12" r="3"></circle>
+            <line x1="12" y1="2" x2="12" y2="5"></line>
+            <line x1="12" y1="19" x2="12" y2="22"></line>
+            <line x1="2" y1="12" x2="5" y2="12"></line>
+            <line x1="19" y1="12" x2="22" y2="12"></line>
+        </svg>
+    </button>
     
     <div id="list-view">
         <div class="search-container">
@@ -63,7 +74,12 @@
                     <div class="toggle-slider"></div>
                 </div>
             </div>
-
+            <div class="toggle-control">
+                <label for="toggle-orientation">Heading</label>
+                <div class="toggle" id="toggle-orientation">
+                    <div class="toggle-slider"></div>
+                </div>
+            </div>
         </div>
     </div>
     
@@ -103,6 +119,17 @@
         let currentFilter = '';
         let isClusteringEnabled = true;
         let isHeatmapEnabled = false;
+        let userLocationMarker = null; // To store the Leaflet marker for user's location
+        let userLocationAccuracyCircle = null; // To store the circle for accuracy
+        let locationWatchId = null;    // To store the ID from watchPosition
+        let isLocating = false;        // Flag to track if geolocation is active
+        let initialLocationFound = false; // Flag for one-time map pan/zoom
+
+        let isOrientationEnabled = false;
+        let currentHeading = 0; // Store the current heading
+
+        const arrowIconSvg = `<svg viewBox="0 0 24 24" width="24" height="24" style="transform-origin: center; fill: var(--primary-color); stroke: var(--white-color, #fff); stroke-width: 1px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2)); pointer-events: none;"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 2.99l.71-.71z"></path></svg>`;
+        const userLocationArrowIcon = L.divIcon({ className: 'user-location-icon', html: arrowIconSvg, iconSize: [24, 24], iconAnchor: [12, 12] });
         
         // Initialize the application
         async function init() {
@@ -497,8 +524,10 @@
             document.getElementById('nav-list').classList.remove('active');
             document.getElementById('nav-load').classList.remove('active');
             document.getElementById('controls-wrapper').classList.add('show');
-            document.getElementById('file-input-wrapper').classList.remove('show');
-            
+            // document.getElementById('file-input-wrapper').classList.remove('show'); // Already display:none via CSS
+            document.getElementById('my-location-button').style.display = 'flex';
+
+
             if (currentFilter) {
                 document.getElementById('clear-filter').style.display = 'block';
             }
@@ -517,7 +546,8 @@
             document.getElementById('nav-list').classList.add('active');
             document.getElementById('nav-load').classList.remove('active');
             document.getElementById('controls-wrapper').classList.remove('show');
-            document.getElementById('file-input-wrapper').classList.remove('show');
+            // document.getElementById('file-input-wrapper').classList.remove('show'); // Already display:none via CSS
+            document.getElementById('my-location-button').style.display = 'none';
             document.getElementById('clear-filter').style.display = 'none';
         }
         
@@ -631,6 +661,284 @@
                     toggleIcon.innerHTML = closeIconSVG;
                 }
             });
+
+            // Toggle controls
+            document.getElementById('toggle-clustering').addEventListener('click', toggleClustering);
+            document.getElementById('toggle-heatmap').addEventListener('click', toggleHeatmap);
+
+            // Search input
+            document.getElementById('search-input').addEventListener('input', function(e) {
+                currentFilter = e.target.value;
+                renderList(currentFilter);
+                applyFilterToMap(currentFilter);
+
+                document.getElementById('search-clear').style.display =
+                    currentFilter.length > 0 ? 'block' : 'none';
+            });
+
+            // Clear filter buttons
+            document.getElementById('clear-filter').addEventListener('click', function() {
+                currentFilter = '';
+                document.getElementById('search-input').value = '';
+                document.getElementById('search-clear').style.display = 'none';
+                renderList();
+                applyFilterToMap('');
+                this.style.display = 'none';
+            });
+
+            document.getElementById('search-clear').addEventListener('click', function() {
+                currentFilter = '';
+                document.getElementById('search-input').value = '';
+                renderList();
+                applyFilterToMap('');
+                this.style.display = 'none';
+            });
+
+            // Map events
+            map.on('moveend zoomend', function() {
+                if (isHeatmapEnabled) {
+                    updateHeatmap();
+                }
+            });
+
+            // Click outside to close controls
+            document.addEventListener('click', function(e) {
+                const controlsWrapper = document.getElementById('controls-wrapper');
+                const controls = document.getElementById('controls');
+                const toggle = document.getElementById('controls-toggle');
+
+                if (!controlsWrapper.contains(e.target) && controls.classList.contains('expanded')) {
+                    controls.classList.remove('expanded');
+                    toggle.classList.remove('expanded');
+                    document.getElementById('toggle-icon').textContent = '⚙️';
+                }
+            });
+        }
+
+        // --- Geolocation Functions ---
+
+        function handleUserLocation(position) {
+            const { latitude, longitude, accuracy } = position.coords;
+            console.log(`User location: Lat ${latitude}, Lon ${longitude}, Accuracy ${accuracy.toFixed(0)}m`);
+            showStatusMessage(`Location: ${accuracy.toFixed(0)}m accuracy`, 'info', 3000);
+
+            if (!userLocationMarker) {
+                userLocationMarker = L.marker([latitude, longitude], { icon: userLocationArrowIcon }).addTo(map);
+            } else {
+                userLocationMarker.setLatLng([latitude, longitude]);
+            }
+
+            // Apply rotation if orientation is enabled (marker exists or was just created)
+            if (isOrientationEnabled && userLocationMarker) {
+                const iconEl = userLocationMarker.getElement();
+                if (iconEl && iconEl.firstChild) {
+                    iconEl.firstChild.style.transform = `rotate(${currentHeading}deg)`;
+                }
+            }
+
+
+            if (!userLocationAccuracyCircle) {
+                userLocationAccuracyCircle = L.circle([latitude, longitude], {
+                    radius: accuracy,
+                    weight: 1, // Thin border for accuracy circle
+                    color: 'var(--primary-color)',
+                    fillColor: 'var(--primary-color)',
+                    fillOpacity: 0.1
+                }).addTo(map);
+            } else {
+                userLocationAccuracyCircle.setLatLng([latitude, longitude]).setRadius(accuracy);
+            }
+
+            if (!initialLocationFound) {
+                map.setView([latitude, longitude], 16);
+                initialLocationFound = true;
+            }
+        }
+
+        function handleOrientation(event) {
+            if (!isOrientationEnabled || !userLocationMarker) return;
+
+            let heading = null;
+
+            if (event.webkitCompassHeading) { // iOS
+                heading = event.webkitCompassHeading;
+            } else if (event.absolute === true && event.alpha !== null) { // Standard
+                heading = event.alpha;
+            }
+
+            if (heading !== null) {
+                currentHeading = heading;
+                const iconElement = userLocationMarker.getElement();
+                if (iconElement && iconElement.firstChild) {
+                    const actualVisualElement = iconElement.firstChild;
+                    actualVisualElement.style.transform = `rotate(${heading}deg)`;
+                }
+            }
+        }
+
+        function toggleOrientation() {
+            isOrientationEnabled = !isOrientationEnabled;
+            document.getElementById('toggle-orientation').classList.toggle('active', isOrientationEnabled);
+
+            if (isOrientationEnabled) {
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    DeviceOrientationEvent.requestPermission()
+                        .then(permissionState => {
+                            if (permissionState === 'granted') {
+                                window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+                                window.addEventListener('deviceorientation', handleOrientation, true); // Fallback
+                                showStatusMessage('Compass heading enabled.', 'info');
+                            } else {
+                                showStatusMessage('Permission for device orientation not granted.', 'error');
+                                isOrientationEnabled = false;
+                                document.getElementById('toggle-orientation').classList.remove('active');
+                            }
+                        })
+                        .catch(error => {
+                            console.error("Error requesting device orientation permission:", error);
+                            showStatusMessage('Could not enable compass: ' + error.message, 'error');
+                            isOrientationEnabled = false;
+                            document.getElementById('toggle-orientation').classList.remove('active');
+                        });
+                } else {
+                    if ('ondeviceorientationabsolute' in window) {
+                        window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+                    } else if ('ondeviceorientation' in window) {
+                        window.addEventListener('deviceorientation', handleOrientation, true);
+                    } else {
+                         showStatusMessage('Device orientation not supported on this browser.', 'error');
+                         isOrientationEnabled = false;
+                         document.getElementById('toggle-orientation').classList.remove('active');
+                         return;
+                    }
+                    showStatusMessage('Compass heading enabled.', 'info');
+                }
+            } else { // Disabling orientation
+                window.removeEventListener('deviceorientationabsolute', handleOrientation, true);
+                window.removeEventListener('deviceorientation', handleOrientation, true);
+                showStatusMessage('Compass heading disabled.', 'info');
+                if (userLocationMarker) {
+                    const iconElement = userLocationMarker.getElement();
+                    if (iconElement && iconElement.firstChild) {
+                        iconElement.firstChild.style.transform = 'rotate(0deg)';
+                    }
+                }
+                currentHeading = 0;
+            }
+        }
+
+        function handleLocationError(error) {
+            console.error("Error getting user location:", error);
+            isLocating = false;
+            document.getElementById('my-location-button').classList.remove('active-locating');
+            initialLocationFound = false;
+
+            let message = "Could not retrieve your location.";
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    message = "Location permission denied. Please enable it in your browser settings.";
+                    if (locationWatchId !== null) navigator.geolocation.clearWatch(locationWatchId);
+                    locationWatchId = null;
+                    if (userLocationMarker) { userLocationMarker.remove(); userLocationMarker = null; }
+                    if (userLocationAccuracyCircle) { userLocationAccuracyCircle.remove(); userLocationAccuracyCircle = null; }
+                    if (isOrientationEnabled) toggleOrientation(); // Turn off if permission denied
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    message = "Location information is unavailable.";
+                    if (userLocationMarker) { userLocationMarker.remove(); userLocationMarker = null; }
+                    if (userLocationAccuracyCircle) { userLocationAccuracyCircle.remove(); userLocationAccuracyCircle = null; }
+                    if (isOrientationEnabled) toggleOrientation(); // Turn off if position unavailable
+                    break;
+                case error.TIMEOUT:
+                    message = "The request to get user location timed out.";
+                    break;
+                default:
+                    message = "An unknown error occurred: " + error.message;
+                    break;
+            }
+            showStatusMessage(message, 'error');
+        }
+
+        function toggleUserLocationWatch() {
+            const myLocationButton = document.getElementById('my-location-button');
+            if (locationWatchId !== null) { // Currently watching, so stop
+                if (isOrientationEnabled) toggleOrientation(); // Turn off orientation first
+                navigator.geolocation.clearWatch(locationWatchId);
+                locationWatchId = null;
+                isLocating = false;
+                initialLocationFound = false; // Reset this flag
+                if (userLocationMarker) {
+                    userLocationMarker.remove();
+                    userLocationMarker = null;
+                }
+                if (userLocationAccuracyCircle) {
+                    userLocationAccuracyCircle.remove();
+                    userLocationAccuracyCircle = null;
+                }
+                showStatusMessage("Stopped tracking your location.", 'info');
+                myLocationButton.classList.remove('active-locating');
+            } else { // Not watching, so start
+                if (navigator.geolocation) {
+                    isLocating = true;
+                    myLocationButton.classList.add('active-locating');
+                    showStatusMessage("Trying to find your location...", 'info', 2000);
+
+                    const options = {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 0
+                    };
+                    locationWatchId = navigator.geolocation.watchPosition(
+                        handleUserLocation,
+                        handleLocationError,
+                        options
+                    );
+                } else {
+                    showStatusMessage("Geolocation is not supported by your browser.", 'error');
+                }
+            }
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            // Navigation buttons
+            document.getElementById('nav-map').addEventListener('click', showMapView);
+            document.getElementById('nav-list').addEventListener('click', showListView);
+
+            const navLoadButton = document.getElementById('nav-load');
+            navLoadButton.addEventListener('click', function(event) {
+                event.preventDefault();
+                document.getElementById('file-input').click();
+            });
+
+            // File input
+            document.getElementById('file-input').addEventListener('change', handleFileSelect);
+
+            // "My Location" button
+            document.getElementById('my-location-button').addEventListener('click', toggleUserLocationWatch);
+
+            // Orientation Toggle
+            document.getElementById('toggle-orientation').addEventListener('click', toggleOrientation);
+
+            // Controls toggle
+            document.getElementById('controls-toggle').addEventListener('click', function() {
+                const controls = document.getElementById('controls');
+                const toggleIcon = document.getElementById('toggle-icon');
+                const isExpanded = controls.classList.contains('expanded');
+
+                const gearIconSVG = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>';
+                const closeIconSVG = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+
+                if (isExpanded) { // When closing
+                    controls.classList.remove('expanded');
+                    this.classList.remove('expanded');
+                    toggleIcon.innerHTML = gearIconSVG;
+                } else { // When opening
+                    controls.classList.add('expanded');
+                    this.classList.add('expanded');
+                    toggleIcon.innerHTML = closeIconSVG;
+                }
+            });
             
             // Toggle controls
             document.getElementById('toggle-clustering').addEventListener('click', toggleClustering);
@@ -680,7 +988,8 @@
                 if (!controlsWrapper.contains(e.target) && controls.classList.contains('expanded')) {
                     controls.classList.remove('expanded');
                     toggle.classList.remove('expanded');
-                    document.getElementById('toggle-icon').textContent = '⚙️';
+                    document.getElementById('toggle-icon').innerHTML = // Set back to gear icon
+                        '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>';
                 }
             });
         }
