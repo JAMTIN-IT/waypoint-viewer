@@ -1,0 +1,687 @@
+:root {
+    --primary-color: #007bff;
+    --primary-hover-color: #0069d9;
+    --primary-active-color: #005cbf;
+    --primary-active-nav-bg-color: #0056b3; /* Darker for active nav tab */
+    --primary-rgb: 0, 123, 255; /* For rgba box-shadow */
+
+    --secondary-color: #6c757d;
+    /* No hover/active for secondary needed yet */
+
+    --accent-color: #17a2b8;
+    --accent-hover-color: #138496;
+    --accent-active-color: #117a8b;
+
+    --success-color: #28a745;
+    /* No hover/active for success needed yet */
+    --error-color: #dc3545;
+    --error-hover-color: #c82333;
+    --error-active-color: #bd2130;
+
+    --light-bg: #f8f9fa;
+    --light-bg-hover: #e9ecef; /* For elements with light-bg background */
+
+    --dark-text: #212529;
+    --medium-text: #495057;
+    --light-text: #f8f9fa; /* Text on dark backgrounds */
+    --white-color: #fff; /* Explicit white */
+    --white-hover-color: #f0f0f0; /* For elements with white background, like controls toggle */
+
+
+    --border-color: #dee2e6;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
+    --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+    --shadow-xl: 0 4px 12px rgba(0, 0, 0, 0.15); /* For status messages */
+
+    /* Toggle specific variables */
+    --toggle-width: 48px;
+    --toggle-height: 28px;
+    --toggle-slider-width: 24px;
+    --toggle-slider-height: 24px;
+    --toggle-padding: 2px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+    background-color: var(--light-bg);
+    color: var(--dark-text);
+}
+
+#map {
+    height: calc(100vh - 60px);
+    width: 100%;
+}
+
+#list-view {
+    display: none;
+    height: calc(100vh - 60px);
+    width: 100%;
+    overflow-y: auto;
+    background: var(--light-bg);
+}
+
+.bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: var(--dark-text);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+    z-index: 1000;
+}
+
+.nav-button {
+    flex: 1;
+    height: 100%;
+    background: none;
+    border: none;
+    color: var(--light-text);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 0 5px;
+    border-top: 3px solid transparent; /* Placeholder for consistent height */
+}
+
+.nav-button:hover {
+    background-color: rgba(255,255,255,0.08);
+    transform: translateY(-1px);
+}
+.nav-button:active { /* This is for momentary press */
+    background-color: rgba(255,255,255,0.12); /* Slightly more feedback on press */
+    transform: translateY(0px);
+}
+
+/* Active state for actual VIEW selection (Map or List) */
+#nav-map.active,
+#nav-list.active {
+    background-color: var(--primary-active-nav-bg-color);
+    color: var(--white-color);
+    border-top: 3px solid var(--primary-color); /* Highlight for active view */
+    transform: none;
+}
+#nav-map.active:hover,
+#nav-list.active:hover {
+    background-color: var(--primary-active-nav-bg-color); /* Keep bg same as active on hover */
+}
+
+/* #nav-load should not have a persistent 'active' view style */
+/* Its :active pseudo-class handles press feedback */
+/* If JS adds .active class to #nav-load, this ensures it's not styled as a view */
+#nav-load.active {
+    background-color: rgba(255,255,255,0.08); /* Similar to hover, or its :active state */
+    border-top-color: transparent; /* Important: no active view border */
+}
+
+
+.nav-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 20px;
+    width: 20px;
+}
+
+.nav-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.controls-wrapper {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 1000;
+    display: none;
+}
+
+.controls-wrapper.show {
+    display: block;
+}
+
+.file-input-wrapper {
+    /* position: absolute; top: 10px; left: 10px; z-index: 1000; */
+    /* background: var(--white-color); border-radius: 8px; */
+    /* box-shadow: var(--shadow-md); padding: 15px; */
+    display: none !important; /* Always hidden */
+}
+
+/* .file-input-wrapper.show { display: block; } */ /* No longer needed */
+
+
+.file-input {
+    display: none;
+}
+
+.file-input-button {
+    background: var(--primary-color);
+    color: var(--white-color);
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+.file-input-button .nav-icon {
+    height: 18px;
+    width: 18px;
+}
+
+.file-input-button:hover {
+    background-color: var(--primary-hover-color);
+    transform: translateY(-1px);
+}
+.file-input-button:active {
+    background-color: var(--primary-active-color);
+    transform: translateY(0px);
+    box-shadow: var(--shadow-sm);
+}
+
+.controls-toggle {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    width: 44px;
+    height: 44px;
+    background: var(--white-color);
+    border-radius: 8px;
+    box-shadow: var(--shadow-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform 0.2s ease-in-out, background-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    z-index: 1010;
+}
+.controls-toggle svg {
+    width: 24px;
+    height: 24px;
+}
+
+.controls-toggle:hover {
+    transform: scale(1.05) translateY(-1px);
+    background-color: var(--white-hover-color);
+    box-shadow: var(--shadow-lg);
+}
+.controls-toggle:active {
+    transform: scale(1.0) translateY(0px);
+    background-color: var(--light-bg-hover);
+}
+
+.controls-toggle.expanded {
+    background: #e9ecef;
+    transform: scale(1.0);
+}
+
+
+.controls {
+    position: absolute;
+    top: 54px;
+    right: 0;
+    background: var(--white-color);
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border-color);
+    display: none;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 180px;
+}
+
+.controls.expanded {
+    display: flex;
+}
+
+.toggle-control {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+}
+
+.toggle-control label {
+    font-size: 14px;
+    color: var(--medium-text);
+    font-weight: 500;
+}
+
+.toggle {
+    width: var(--toggle-width);
+    height: var(--toggle-height);
+    background: var(--secondary-color);
+    border-radius: calc(var(--toggle-height) / 2);
+    position: relative;
+    cursor: pointer;
+    transition: background-color 0.3s, box-shadow 0.2s ease-in-out;
+    flex-shrink: 0;
+}
+.toggle:hover {
+    box-shadow: 0 0 0 4px rgba(var(--primary-rgb), 0.1);
+}
+
+.toggle.active {
+    background: var(--primary-color);
+}
+.toggle.active:hover {
+     box-shadow: 0 0 0 4px rgba(var(--primary-rgb), 0.2);
+}
+
+
+.toggle-slider {
+    position: absolute;
+    top: var(--toggle-padding);
+    left: var(--toggle-padding);
+    width: var(--toggle-slider-width);
+    height: var(--toggle-slider-height);
+    background: var(--white-color);
+    border-radius: 50%;
+    transition: transform 0.3s ease-in-out;
+    box-shadow: var(--shadow-sm);
+}
+
+.toggle.active .toggle-slider {
+    transform: translateX(calc(var(--toggle-width) - var(--toggle-slider-width) - (2 * var(--toggle-padding))));
+}
+
+.search-container {
+    padding: 12px 15px;
+    background: var(--white-color);
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.search-input-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.search-input {
+    width: 100%;
+    padding: 10px 15px;
+    padding-right: 40px;
+    border: 1px solid var(--border-color);
+    border-radius: 25px;
+    font-size: 16px;
+    font-weight: 400;
+    outline: none;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.search-clear {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--secondary-color);
+    cursor: pointer;
+    display: none;
+    z-index: 5;
+    padding: 5px;
+    line-height: 0;
+    transition: color 0.2s ease-in-out;
+}
+.search-clear svg {
+    width: 16px;
+    height: 16px;
+    display: block;
+}
+
+.search-clear:hover {
+    color: var(--error-hover-color);
+}
+.search-clear:active {
+    color: var(--error-active-color);
+}
+
+
+.search-input:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(var(--primary-rgb), 0.25);
+}
+
+.waypoint-item {
+    background: var(--white-color);
+    margin: 12px 10px;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, background-color 0.2s ease-in-out;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    border: 1px solid var(--border-color);
+}
+
+.waypoint-item:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    background-color: var(--light-bg-hover);
+}
+
+.waypoint-info {
+    flex: 1;
+}
+
+.waypoint-item-button {
+    background: var(--primary-color);
+    color: var(--white-color);
+    border: none;
+    padding: 8px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out, box-shadow 0.2s ease-in-out;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.waypoint-item-button:hover {
+    background-color: var(--primary-hover-color);
+    transform: translateY(-1px);
+}
+.waypoint-item-button:active {
+    background-color: var(--primary-active-color);
+    transform: translateY(0px);
+    box-shadow: var(--shadow-sm);
+}
+
+
+.waypoint-item-button-text {
+    display: inline;
+}
+
+.waypoint-item-button-icon {
+    display: none;
+    font-size: 0;
+    line-height: 0;
+}
+.waypoint-item-button-icon svg {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+
+
+.waypoint-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--dark-text);
+    margin-bottom: 5px;
+}
+
+.waypoint-coords {
+    font-size: 14px;
+    color: var(--medium-text);
+    margin-bottom: 5px;
+    font-weight: 400;
+}
+
+.waypoint-desc {
+    font-size: 14px;
+    color: var(--medium-text);
+    line-height: 1.4;
+    font-weight: 400;
+}
+
+.clear-filter {
+    position: absolute;
+    top: 10px;
+    right: 55px;
+    background: var(--accent-color);
+    color: var(--white-color);
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    display: none;
+    z-index: 1000;
+    box-shadow: var(--shadow-sm);
+    transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.clear-filter:hover {
+    background-color: var(--accent-hover-color);
+    transform: translateY(-1px) scale(1.02);
+}
+.clear-filter:active {
+    background-color: var(--accent-active-color);
+    transform: translateY(0px) scale(1.0);
+    box-shadow: var(--shadow-sm);
+}
+
+
+.no-results {
+    text-align: center;
+    padding: 40px;
+    color: var(--medium-text);
+    font-size: 16px;
+}
+
+.loading {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 2000;
+    background: rgba(255,255,255,0.95);
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: var(--shadow-lg);
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 3px solid #f0f0f0;
+    border-top: 3px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 10px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.popup-content {
+    max-width: 280px;
+    padding: 5px;
+}
+
+.popup-title {
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--dark-text);
+    font-size: 16px;
+}
+
+.popup-info {
+    font-size: 13px;
+    color: var(--medium-text);
+    line-height: 1.4;
+    font-weight: 400;
+}
+
+.popup-info div {
+    margin-bottom: 4px;
+}
+
+.status-message {
+    position: absolute;
+    top: 70px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--white-color);
+    padding: 12px 20px;
+    border-radius: 25px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 2010;
+    display: none;
+    box-shadow: var(--shadow-xl);
+    text-align: center;
+}
+
+.status-message.error {
+    background: var(--error-color);
+}
+
+.status-message.success {
+    background: var(--success-color);
+}
+
+.status-message.info {
+    background: var(--primary-color);
+}
+
+
+.marine-info {
+    background: #e9ecef;
+    padding: 8px;
+    border-radius: 4px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--medium-text);
+    border: 1px solid var(--border-color);
+}
+
+
+@media (max-width: 480px) {
+    .controls-toggle {
+        top: 15px;
+        right: 15px;
+        width: 44px;
+        height: 44px;
+        z-index: 1001;
+    }
+    .controls-toggle svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    /* .file-input-wrapper is display: none !important */
+
+    .controls {
+        min-width: 200px;
+        padding: 15px;
+        right: 15px;
+        top: calc(15px + 44px + 10px);
+        width: calc(100% - 30px);
+        max-width: 280px;
+    }
+
+    .toggle-control label {
+        font-size: 13px;
+    }
+
+    .waypoint-item {
+        margin: 10px 8px;
+        padding: 12px;
+    }
+
+    .waypoint-name {
+        font-size: 16px;
+        font-weight: 600;
+    }
+
+    .waypoint-item-button-text {
+        display: none;
+    }
+
+    .waypoint-item-button-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .waypoint-item-button {
+        padding: 10px 14px;
+    }
+
+    .clear-filter {
+        top: 70px;
+        right: 15px;
+        padding: 8px 16px;
+        font-size: 14px;
+    }
+
+    .nav-button {
+        font-size: 12px;
+        font-weight: 500;
+        gap: 3px;
+    }
+
+    .nav-icon {
+        height: 18px;
+        width: 18px;
+    }
+    .file-input-button .nav-icon {
+        height: 16px;
+        width: 16px;
+    }
+
+
+    .search-input {
+        font-size: 15px;
+        padding: 8px 15px;
+        padding-right: 35px;
+    }
+    .search-clear {
+        right: 8px;
+    }
+    .search-clear svg {
+        width: 14px;
+        height: 14px;
+    }
+
+
+    .status-message {
+        top: 15px;
+        padding: 10px 15px;
+        font-size: 13px;
+        width: calc(100% - 30px);
+        margin-left: 15px;
+        margin-right: 15px;
+        left: 0;
+        transform: none;
+        box-sizing: border-box;
+    }
+}
