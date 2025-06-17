@@ -27,17 +27,13 @@
     </div>
     
     <div id="map"></div>
-    <button id="my-location-button" class="map-floating-button" title="Find my location">
-        <!-- SVG icon for "my location" -->
+    <button id="my-location-button" class="map-floating-button" title="Find my location" style="display: none;">
         <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <circle cx="12" cy="12" r="3"></circle>
-            <line x1="12" y1="2" x2="12" y2="5"></line>
-            <line x1="12" y1="19" x2="12" y2="22"></line>
-            <line x1="2" y1="12" x2="5" y2="12"></line>
-            <line x1="19" y1="12" x2="22" y2="12"></line>
+            <circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle><line x1="12" y1="2" x2="12" y2="5"></line><line x1="12" y1="19" x2="12" y2="22"></line><line x1="2" y1="12" x2="5" y2="12"></line><line x1="19" y1="12" x2="22" y2="12"></line>
         </svg>
     </button>
+    <button id="map-orientation-button" class="map-floating-button" title="Toggle map orientation (North Up)" style="display: none;"></button>
+    <div id="accuracy-display" class="map-fixed-overlay">Accuracy: ---</div>
     
     <div id="list-view">
         <div class="search-container">
@@ -108,6 +104,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.js"></script>
     <!-- Leaflet Heat JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+    <!-- Leaflet.Map.Rotate Plugin -->
+    <script src="https://unpkg.com/leaflet-rotate/dist/leaflet.rotate.js"></script>
     
     <script>
         // Global variables
@@ -119,43 +117,43 @@
         let currentFilter = '';
         let isClusteringEnabled = true;
         let isHeatmapEnabled = false;
-        let userLocationMarker = null; // To store the Leaflet marker for user's location
-        let userLocationAccuracyCircle = null; // To store the circle for accuracy
-        let locationWatchId = null;    // To store the ID from watchPosition
-        let isLocating = false;        // Flag to track if geolocation is active
-        let initialLocationFound = false; // Flag for one-time map pan/zoom
 
-        let isOrientationEnabled = false;
-        let currentHeading = 0; // Store the current heading
+        // Geolocation and Orientation
+        let userLocationMarker = null;
+        let userLocationAccuracyCircle = null;
+        let locationWatchId = null;
+        let isLocating = false;
+        let initialLocationFound = false;
+
+        let isOrientationEnabled = false; // For device heading on marker
+        let currentHeading = 0;
+        let mapOrientationMode = 'northUp'; // 'northUp', 'headingUp'
 
         const arrowIconSvg = `<svg viewBox="0 0 24 24" width="24" height="24" style="transform-origin: center; fill: var(--primary-color); stroke: var(--white-color, #fff); stroke-width: 1px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.2)); pointer-events: none;"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 2.99l.71-.71z"></path></svg>`;
         const userLocationArrowIcon = L.divIcon({ className: 'user-location-icon', html: arrowIconSvg, iconSize: [24, 24], iconAnchor: [12, 12] });
+
+        const dotIconSvgForMapRotate = `<div style="background-color: var(--primary-color); width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--white-color, #fff); box-shadow: var(--shadow-md); transform-origin: center;"></div>`;
+        const userLocationDotIconForMapRotate = L.divIcon({ className: 'user-location-icon-dot', html: dotIconSvgForMapRotate, iconSize: [20, 20], iconAnchor: [10, 10]});
+
+        const compassNorthUpIconSvg = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L12 6"></path><path d="M12 18L12 22"></path><path d="M18 12L22 12"></path><path d="M2 12L6 12"></path><circle cx="12" cy="12" r="7"></circle><polygon points="12 2 10 6 14 6 12 2" fill="currentColor"></polygon></svg>`;
+        const deviceHeadingUpIconSvg = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L12 22M5 9l7-7 7 7"/></svg>`;
         
         // Initialize the application
         async function init() {
             try {
                 console.log('Initializing map...');
-                
-                // Initialize map with Cape Town area as default
-                map = L.map('map').setView([-34.5, 19.3], 10);
-                
-                // Add tile layer
+                map = L.map('map', {
+                    rotate: true // Enable map rotation
+                }).setView([-34.5, 19.3], 10);
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    attribution: '© OpenStreetMap contributors',
-                    maxZoom: 19
+                    attribution: '© OpenStreetMap contributors', maxZoom: 19
                 }).addTo(map);
-                
                 console.log('Map initialized successfully');
                 
-                // Initialize marker cluster group
                 markerClusterGroup = L.markerClusterGroup({
-                    showCoverageOnHover: false,
-                    maxClusterRadius: 80,
-                    spiderfyOnMaxZoom: true,
-                    zoomToBoundsOnClick: true
+                    showCoverageOnHover: false, maxClusterRadius: 80, spiderfyOnMaxZoom: true, zoomToBoundsOnClick: true
                 });
                 
-                // Try to load default GPX file
                 try {
                     await loadGPXFile('waypoints.gpx');
                     console.log('Default GPX loaded successfully');
@@ -164,17 +162,10 @@
                     showStatusMessage('Ready! Load a GPX file to view your fishing spots 🎣', 'info');
                 }
                 
-                // Setup event listeners
                 setupEventListeners();
-                
-                // Show controls on initial map view
                 document.getElementById('controls-wrapper').classList.add('show');
-                
-                // Hide loading indicator
                 document.getElementById('loading').style.display = 'none';
-                
                 console.log('Initialization complete');
-                
             } catch (error) {
                 console.error('Initialization error:', error);
                 showStatusMessage('Error initializing map. Please refresh and try again.', 'error');
@@ -182,7 +173,6 @@
             }
         }
         
-        // Parse GPX file
         async function loadGPXFile(filename, fileContent = null) {
             try {
                 let text;
@@ -190,333 +180,144 @@
                     text = fileContent;
                 } else {
                     const response = await fetch(filename);
-                    if (!response.ok) {
-                        throw new Error(`Failed to fetch ${filename}: ${response.status}`);
-                    }
+                    if (!response.ok) throw new Error(`Failed to fetch ${filename}: ${response.status}`);
                     text = await response.text();
                 }
-                
                 const parser = new DOMParser();
                 const gpx = parser.parseFromString(text, 'application/xml');
-                
-                // Check for parsing errors
                 const parseError = gpx.querySelector('parsererror');
-                if (parseError) {
-                    throw new Error('Invalid GPX file format');
-                }
+                if (parseError) throw new Error('Invalid GPX file format');
                 
-                // Extract waypoints
                 const wpts = gpx.querySelectorAll('wpt');
-                waypoints = Array.from(wpts).map(wpt => {
-                    const lat = parseFloat(wpt.getAttribute('lat'));
-                    const lon = parseFloat(wpt.getAttribute('lon'));
-                    const name = wpt.querySelector('name')?.textContent || 'Unnamed';
-                    const desc = wpt.querySelector('desc')?.textContent || '';
-                    const cmt = wpt.querySelector('cmt')?.textContent || '';
-                    const ele = wpt.querySelector('ele')?.textContent || '';
-                    const time = wpt.querySelector('time')?.textContent || '';
-                    const sym = wpt.querySelector('sym')?.textContent || 'Waypoint';
-                    
-                    return { lat, lon, name, desc, cmt, ele, time, sym };
-                });
+                waypoints = Array.from(wpts).map(wpt => ({
+                    lat: parseFloat(wpt.getAttribute('lat')),
+                    lon: parseFloat(wpt.getAttribute('lon')),
+                    name: wpt.querySelector('name')?.textContent || 'Unnamed',
+                    desc: wpt.querySelector('desc')?.textContent || '',
+                    cmt: wpt.querySelector('cmt')?.textContent || '',
+                    ele: wpt.querySelector('ele')?.textContent || '',
+                    time: wpt.querySelector('time')?.textContent || '',
+                    sym: wpt.querySelector('sym')?.textContent || 'Waypoint'
+                }));
                 
-                if (waypoints.length === 0) {
-                    throw new Error('No waypoints found in GPX file');
-                }
-                
+                if (waypoints.length === 0) throw new Error('No waypoints found in GPX file');
                 console.log(`Loaded ${waypoints.length} waypoints`);
-                
-                // Create markers and display
                 createMarkers();
                 updateMapBounds();
                 renderList();
-                
                 showStatusMessage(`🎣 Loaded ${waypoints.length} fishing spots successfully!`, 'success');
-                
             } catch (error) {
                 console.error('Error loading GPX:', error);
                 throw new Error('Failed to load GPX file: ' + error.message);
             }
         }
         
-        // Create markers for waypoints
         function createMarkers() {
-            // Clear existing markers
             markers.forEach(marker => marker.remove());
             markers = [];
             markerClusterGroup.clearLayers();
-            
             waypoints.forEach((waypoint, index) => {
-                // Create custom fishing spot marker
                 const fishingIcon = L.divIcon({
-                    className: 'fishing-marker',
-                    html: getFishingMarkerHtml(waypoint),
-                    iconSize: [30, 30],
-                    iconAnchor: [15, 15],
-                    popupAnchor: [0, -15]
+                    className: 'fishing-marker', html: getFishingMarkerHtml(waypoint),
+                    iconSize: [30, 30], iconAnchor: [15, 15], popupAnchor: [0, -15]
                 });
-                
                 const marker = L.marker([waypoint.lat, waypoint.lon], { icon: fishingIcon });
-                
-                // Create popup content
-                const popupContent = createPopupContent(waypoint);
-                marker.bindPopup(popupContent);
-                
-                // Store reference
+                marker.bindPopup(createPopupContent(waypoint));
                 marker.waypointIndex = index;
                 markers.push(marker);
-                
-                if (isClusteringEnabled) {
-                    markerClusterGroup.addLayer(marker);
-                } else {
-                    marker.addTo(map);
-                }
+                if (isClusteringEnabled) markerClusterGroup.addLayer(marker);
+                else marker.addTo(map);
             });
-            
-            if (isClusteringEnabled && markers.length > 0) {
-                map.addLayer(markerClusterGroup);
-            }
-            
-            // Update heatmap if enabled
-            if (isHeatmapEnabled) {
-                updateHeatmap();
-            }
+            if (isClusteringEnabled && markers.length > 0) map.addLayer(markerClusterGroup);
+            if (isHeatmapEnabled) updateHeatmap();
         }
         
-        // Get fishing marker HTML
         function getFishingMarkerHtml(waypoint) {
-            // Custom SVG for fishing hook icon, always white
             const fishingHookIcon = '<svg viewBox="0 0 24 24" width="18" height="18" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="1.5"><path d="M16.5 8.33c0-2.5-1.67-4.17-4.17-4.17S8.17 5.83 8.17 8.33V15c0 1.67-1.67 3.33-3.33 3.33S1.5 16.67 1.5 15V8.75M16.5 12.5v-1.25c0-1.1-.9-2-2-2s-2 .9-2 2V15"/></svg>';
-
-            // Example of how you might use other SVGs based on conditions:
-            // let iconSvg = fishingHookIcon; // Default
-            // if (waypoint.sym === 'Geocache Found') {
-            //     iconSvg = '<svg>...</svg>'; // Replace with actual SVG for checkmark
-            // } else if (waypoint.name.toLowerCase().includes('boat')) {
-            //     iconSvg = '<svg>...</svg>'; // Replace with actual SVG for boat
-            // } // etc.
-            // For this task, we'll just use the fishing hook for all.
-
-            return `<div style="
-                background: #007bff; /* Updated to new primary color */
-                border: 3px solid white;
-                border-radius: 50%;
-                width: 30px;
-                height: 30px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                font-size: 16px; /* This might need adjustment depending on SVG size */
-                box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-            ">${fishingHookIcon}</div>`;
+            return `<div style="background: #007bff; border: 3px solid white; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">${fishingHookIcon}</div>`;
         }
         
-        // Create popup content
         function createPopupContent(waypoint) {
-            let content = `<div class="popup-content">
-                <div class="popup-title">🎣 ${waypoint.name}</div>
-                <div class="popup-info">`;
-            
-            content += `<div><strong>Coordinates:</strong><br>${formatCoordinates(waypoint.lat, waypoint.lon)}</div>`; 
-            
+            let content = `<div class="popup-content"><div class="popup-title">🎣 ${waypoint.name}</div><div class="popup-info">`;
+            content += `<div><strong>Coordinates:</strong><br>${formatCoordinates(waypoint.lat, waypoint.lon)}</div>`;
             if (waypoint.ele) {
                 const depth = parseFloat(waypoint.ele);
-                if (depth < 0) {
-                    content += `<div><strong>Depth:</strong> ${Math.abs(depth).toFixed(1)}m below surface</div>`;
-                } else {
-                    content += `<div><strong>Elevation:</strong> ${depth.toFixed(1)}m above sea level</div>`;
-                }
+                content += `<div><strong>${depth < 0 ? 'Depth' : 'Elevation'}:</strong> ${Math.abs(depth).toFixed(1)}m ${depth < 0 ? 'below surface' : 'above sea level'}</div>`;
             }
-            
             if (waypoint.time) {
                 const date = new Date(waypoint.time);
-                if (!isNaN(date.getTime())) {
-                    content += `<div><strong>Logged:</strong> ${date.toLocaleDateString()} ${date.toLocaleTimeString()}</div>`;
-                }
+                if (!isNaN(date.getTime())) content += `<div><strong>Logged:</strong> ${date.toLocaleDateString()} ${date.toLocaleTimeString()}</div>`;
             }
-            
             if (waypoint.desc && waypoint.desc !== waypoint.name && waypoint.desc !== waypoint.cmt) {
-                // Check if it's marine data
-                if (waypoint.desc.includes('Marine Data')) {
-                    content += `<div class="marine-info">${waypoint.desc}</div>`;
-                } else {
-                    content += `<div><strong>Notes:</strong><br>${waypoint.desc}</div>`;
-                }
+                content += `<div class="${waypoint.desc.includes('Marine Data') ? 'marine-info' : ''}">${waypoint.desc.includes('Marine Data') ? waypoint.desc : `<strong>Notes:</strong><br>${waypoint.desc}`}</div>`;
             } else if (waypoint.cmt && waypoint.cmt !== waypoint.name) {
                 content += `<div><strong>Comment:</strong><br>${waypoint.cmt}</div>`;
             }
-            
             content += '</div></div>';
             return content;
         }
         
-        // Show status message
-        function showStatusMessage(message, type = 'info') {
+        function showStatusMessage(message, type = 'info', duration = 4000) {
             const statusEl = document.getElementById('status-message');
             statusEl.textContent = message;
             statusEl.className = `status-message ${type}`;
             statusEl.style.display = 'block';
-            
-            setTimeout(() => {
-                statusEl.style.display = 'none';
-            }, 4000);
+            setTimeout(() => { statusEl.style.display = 'none'; }, duration);
         }
         
-        // Update map bounds to fit all waypoints
         function updateMapBounds() {
-            if (waypoints.length > 0) {
-                const bounds = L.latLngBounds(waypoints.map(w => [w.lat, w.lon]));
-                map.fitBounds(bounds, { padding: [50, 50] });
-            }
+            if (waypoints.length > 0) map.fitBounds(L.latLngBounds(waypoints.map(w => [w.lat, w.lon])), { padding: [50, 50] });
         }
         
-        // Format coordinates in a more readable way
         function formatCoordinates(lat, lon) {
-            // Format latitude
-            const latDir = lat >= 0 ? 'N' : 'S';
-            const latAbs = Math.abs(lat);
-            const latDeg = Math.floor(latAbs);
-            const latMin = Math.floor((latAbs - latDeg) * 60);
-            const latSec = ((latAbs - latDeg - latMin / 60) * 3600).toFixed(1);
-            
-            // Format longitude
-            const lonDir = lon >= 0 ? 'E' : 'W';
-            const lonAbs = Math.abs(lon);
-            const lonDeg = Math.floor(lonAbs);
-            const lonMin = Math.floor((lonAbs - lonDeg) * 60);
-            const lonSec = ((lonAbs - lonDeg - lonMin / 60) * 3600).toFixed(1);
-            
-            // Return formatted coordinates in DMS (Degrees, Minutes, Seconds) format
-            return `${latDeg}°${latMin}'${latSec}" ${latDir}, ${lonDeg}°${lonMin}'${lonSec}" ${lonDir}`;
+            const formatDMS = (val, dirPos, dirNeg) => {
+                const dir = val >= 0 ? dirPos : dirNeg;
+                val = Math.abs(val);
+                const deg = Math.floor(val);
+                const min = Math.floor((val - deg) * 60);
+                const sec = ((val - deg - min / 60) * 3600).toFixed(1);
+                return `${deg}°${min}'${sec}" ${dir}`;
+            };
+            return `${formatDMS(lat, 'N', 'S')}, ${formatDMS(lon, 'E', 'W')}`;
         }
         
-        // Render list view
         function renderList(filter = '') {
             const listContainer = document.getElementById('waypoint-list');
-            const filteredWaypoints = filter 
-                ? waypoints.filter(w => w.name.toLowerCase().includes(filter.toLowerCase()) ||
-                                     (w.desc && w.desc.toLowerCase().includes(filter.toLowerCase())))
-                : waypoints;
-            
-            if (filteredWaypoints.length === 0) {
-                listContainer.innerHTML = '<div class="no-results">No fishing spots found</div>';
-                return;
-            }
-            
-            listContainer.innerHTML = filteredWaypoints.map((waypoint, index) => {
-                const originalIndex = waypoints.indexOf(waypoint);
-                return `
-                    <div class="waypoint-item" data-index="${originalIndex}">
-                        <div class="waypoint-info">
-                            <div class="waypoint-name">🎣 ${waypoint.name}</div>
-                            <div class="waypoint-coords">📍 ${formatCoordinates(waypoint.lat, waypoint.lon)}</div>
-                            ${waypoint.desc && waypoint.desc !== waypoint.name ? 
-                                `<div class="waypoint-desc">${waypoint.desc.substring(0, 100)}${waypoint.desc.length > 100 ? '...' : ''}</div>` : ''}
-                        </div>
-                        <button class="waypoint-item-button" data-index="${originalIndex}">
-                            <span class="waypoint-item-button-text">Show on map</span>
-                            <span class="waypoint-item-button-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg></span>
-                        </button>
-                    </div>
-                `;
+            const filtered = filter ? waypoints.filter(w => w.name.toLowerCase().includes(filter.toLowerCase()) || (w.desc && w.desc.toLowerCase().includes(filter.toLowerCase()))) : waypoints;
+            if (filtered.length === 0) { listContainer.innerHTML = '<div class="no-results">No fishing spots found</div>'; return; }
+            listContainer.innerHTML = filtered.map(w => {
+                const originalIndex = waypoints.indexOf(w);
+                return `<div class="waypoint-item" data-index="${originalIndex}"><div class="waypoint-info"><div class="waypoint-name">🎣 ${w.name}</div><div class="waypoint-coords">📍 ${formatCoordinates(w.lat, w.lon)}</div>${w.desc && w.desc !== w.name ? `<div class="waypoint-desc">${w.desc.substring(0,100)}${w.desc.length > 100 ? '...' : ''}</div>` : ''}</div><button class="waypoint-item-button" data-index="${originalIndex}"><span class="waypoint-item-button-text">Show on map</span><span class="waypoint-item-button-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg></span></button></div>`;
             }).join('');
-            
-            // Add click handlers
-            document.querySelectorAll('.waypoint-item-button').forEach(button => {
-                button.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    const index = parseInt(this.getAttribute('data-index'));
-                    navigateToWaypoint(index);
-                });
-            });
+            document.querySelectorAll('.waypoint-item-button').forEach(btn => btn.addEventListener('click', function(e){ e.stopPropagation(); navigateToWaypoint(parseInt(this.getAttribute('data-index'))); }));
         }
         
-        // Navigate to waypoint on map
         function navigateToWaypoint(index) {
-            const waypoint = waypoints[index];
-            
-            // Switch to map view
+            const wp = waypoints[index];
             showMapView();
-            
-            // Center map on waypoint
-            map.setView([waypoint.lat, waypoint.lon], 16);
-            
-            // Open popup
-            setTimeout(() => {
-                markers[index].openPopup();
-            }, 300);
+            map.setView([wp.lat, wp.lon], 16);
+            setTimeout(() => { markers[index].openPopup(); }, 300);
         }
         
-        // Update heatmap
         function updateHeatmap() {
-            if (heatmapLayer) {
-                map.removeLayer(heatmapLayer);
-            }
-            
+            if (heatmapLayer) map.removeLayer(heatmapLayer);
             if (isHeatmapEnabled && waypoints.length > 0) {
-                const filteredWaypoints = waypoints
-                    .filter(w => !currentFilter || 
-                        w.name.toLowerCase().includes(currentFilter.toLowerCase()) ||
-                        (w.desc && w.desc.toLowerCase().includes(currentFilter.toLowerCase())));
-                
-                const heatData = filteredWaypoints.map(w => {
-                    const intensity = 0.5 + (Math.random() * 0.5);
-                    return [w.lat, w.lon, intensity];
-                });
-                
-                heatmapLayer = L.heatLayer(heatData, {
-                    radius: 25,
-                    blur: 15,
-                    maxZoom: 17,
-                    max: 1.0,
-                    minOpacity: 0.4,
-                    gradient: {
-                        0.0: 'rgba(0, 0, 255, 0)',
-                        0.2: 'rgba(0, 0, 255, 0.5)',
-                        0.4: 'rgba(0, 255, 255, 0.7)',
-                        0.6: 'rgba(0, 255, 0, 0.8)',
-                        0.8: 'rgba(255, 255, 0, 0.9)',
-                        1.0: 'rgba(255, 0, 0, 1)'
-                    }
-                }).addTo(map);
+                const heatData = waypoints.filter(w => !currentFilter || w.name.toLowerCase().includes(currentFilter.toLowerCase()) || (w.desc && w.desc.toLowerCase().includes(currentFilter.toLowerCase()))).map(w => [w.lat, w.lon, 0.5 + (Math.random() * 0.5)]);
+                heatmapLayer = L.heatLayer(heatData, { radius: 25, blur: 15, maxZoom: 17, max: 1.0, minOpacity: 0.4, gradient: {0.0:'rgba(0,0,255,0)',0.2:'rgba(0,0,255,0.5)',0.4:'rgba(0,255,255,0.7)',0.6:'rgba(0,255,0,0.8)',0.8:'rgba(255,255,0,0.9)',1.0:'rgba(255,0,0,1)'}}).addTo(map);
             }
         }
         
-        // Apply filter to map
         function applyFilterToMap(filter) {
-            if (isClusteringEnabled) {
-                markerClusterGroup.clearLayers();
-            } else {
-                markers.forEach(marker => marker.remove());
-            }
-            
-            waypoints.forEach((waypoint, index) => {
-                const matchesFilter = !filter || 
-                    waypoint.name.toLowerCase().includes(filter.toLowerCase()) ||
-                    (waypoint.desc && waypoint.desc.toLowerCase().includes(filter.toLowerCase()));
-                    
-                if (matchesFilter) {
-                    if (isClusteringEnabled) {
-                        markerClusterGroup.addLayer(markers[index]);
-                    } else {
-                        markers[index].addTo(map);
-                    }
+            if (isClusteringEnabled) markerClusterGroup.clearLayers(); else markers.forEach(m => m.remove());
+            waypoints.forEach((wp, i) => {
+                if (!filter || wp.name.toLowerCase().includes(filter.toLowerCase()) || (wp.desc && wp.desc.toLowerCase().includes(filter.toLowerCase()))) {
+                    if (isClusteringEnabled) markerClusterGroup.addLayer(markers[i]); else markers[i].addTo(map);
                 }
             });
-            
-            if (isHeatmapEnabled) {
-                updateHeatmap();
-            }
-            
-            const clearButton = document.getElementById('clear-filter');
-            if (filter && document.getElementById('map').style.display !== 'none') {
-                clearButton.style.display = 'block';
-            } else {
-                clearButton.style.display = 'none';
-            }
+            if (isHeatmapEnabled) updateHeatmap();
+            document.getElementById('clear-filter').style.display = filter && document.getElementById('map').style.display !== 'none' ? 'block' : 'none';
         }
         
-        // Show map view
         function showMapView() {
             document.getElementById('map').style.display = 'block';
             document.getElementById('list-view').style.display = 'none';
@@ -524,304 +325,170 @@
             document.getElementById('nav-list').classList.remove('active');
             document.getElementById('nav-load').classList.remove('active');
             document.getElementById('controls-wrapper').classList.add('show');
-            // document.getElementById('file-input-wrapper').classList.remove('show'); // Already display:none via CSS
             document.getElementById('my-location-button').style.display = 'flex';
-
-
-            if (currentFilter) {
-                document.getElementById('clear-filter').style.display = 'block';
-            }
-            
+            document.getElementById('map-orientation-button').style.display = 'flex';
+            if (currentFilter) document.getElementById('clear-filter').style.display = 'block';
             map.invalidateSize();
-            if (isHeatmapEnabled) {
-                updateHeatmap();
-            }
+            if (isHeatmapEnabled) updateHeatmap();
         }
         
-        // Show list view
         function showListView() {
             document.getElementById('map').style.display = 'none';
             document.getElementById('list-view').style.display = 'block';
-            document.getElementById('nav-map').classList.remove('active');
             document.getElementById('nav-list').classList.add('active');
+            document.getElementById('nav-map').classList.remove('active');
             document.getElementById('nav-load').classList.remove('active');
             document.getElementById('controls-wrapper').classList.remove('show');
-            // document.getElementById('file-input-wrapper').classList.remove('show'); // Already display:none via CSS
             document.getElementById('my-location-button').style.display = 'none';
+            document.getElementById('map-orientation-button').style.display = 'none';
             document.getElementById('clear-filter').style.display = 'none';
         }
         
-        // Toggle clustering
         function toggleClustering() {
             isClusteringEnabled = !isClusteringEnabled;
-            document.getElementById('toggle-clustering').classList.toggle('active');
-            
-            if (isClusteringEnabled) {
-                markers.forEach(marker => marker.remove());
-                markerClusterGroup.clearLayers();
-                markers.forEach(marker => {
-                    const waypoint = waypoints[marker.waypointIndex];
-                    const matchesFilter = !currentFilter || 
-                        waypoint.name.toLowerCase().includes(currentFilter.toLowerCase()) ||
-                        (waypoint.desc && waypoint.desc.toLowerCase().includes(currentFilter.toLowerCase()));
-                    if (matchesFilter) {
-                        markerClusterGroup.addLayer(marker);
-                    }
-                });
-                map.addLayer(markerClusterGroup);
+            document.getElementById('toggle-clustering').classList.toggle('active', isClusteringEnabled);
+            createMarkers();
+        }
+        
+        function toggleHeatmap() {
+            isHeatmapEnabled = !isHeatmapEnabled;
+            document.getElementById('toggle-heatmap').classList.toggle('active', isHeatmapEnabled);
+            if (isHeatmapEnabled) {
+                if (userLocationMarker) userLocationMarker.setOpacity(0.5); // Make user marker semi-transparent
+                markers.forEach(m => m.setOpacity(0)); // Hide individual markers
+                updateHeatmap();
             } else {
-                map.removeLayer(markerClusterGroup);
-                markers.forEach((marker, index) => {
-                    const waypoint = waypoints[index];
-                    const matchesFilter = !currentFilter || 
-                        waypoint.name.toLowerCase().includes(currentFilter.toLowerCase()) ||
-                        (waypoint.desc && waypoint.desc.toLowerCase().includes(currentFilter.toLowerCase()));
-                    if (matchesFilter) {
-                        marker.addTo(map);
-                    }
-                });
+                if (heatmapLayer) map.removeLayer(heatmapLayer);
+                if (userLocationMarker) userLocationMarker.setOpacity(1); // Restore user marker opacity
+                markers.forEach(m => m.setOpacity(1)); // Restore individual markers
             }
         }
         
-        // Toggle heatmap
-        function toggleHeatmap() {
-            isHeatmapEnabled = !isHeatmapEnabled;
-            document.getElementById('toggle-heatmap').classList.toggle('active');
-            updateHeatmap();
-        }
-        
-        // Handle file selection
         function handleFileSelect(event) {
             const file = event.target.files[0];
             if (!file) return;
-            
-            if (!file.name.toLowerCase().endsWith('.gpx')) {
-                showStatusMessage('Please select a GPX file', 'error');
-                return;
-            }
-            
+            if (!file.name.toLowerCase().endsWith('.gpx')) { showStatusMessage('Please select a GPX file', 'error'); return; }
             document.getElementById('loading').style.display = 'block';
-            document.getElementById('loading').innerHTML = `
-                <div class="loading-spinner"></div>
-                <div>Loading ${file.name}...</div>
-            `;
-            
+            document.getElementById('loading').innerHTML = `<div class="loading-spinner"></div><div>Loading ${file.name}...</div>`;
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = e => {
                 try {
-                    loadGPXFile(file.name, e.target.result).then(() => {
-                        showMapView();
-                        document.getElementById('loading').style.display = 'none';
-                    }).catch(error => {
-                        showStatusMessage(error.message, 'error');
-                        document.getElementById('loading').style.display = 'none';
-                    });
-                } catch (error) {
-                    showStatusMessage('Error reading file: ' + error.message, 'error');
-                    document.getElementById('loading').style.display = 'none';
-                }
+                    loadGPXFile(file.name, e.target.result).then(() => { showMapView(); document.getElementById('loading').style.display = 'none'; }).catch(err => { showStatusMessage(err.message, 'error'); document.getElementById('loading').style.display = 'none'; });
+                } catch (err) { showStatusMessage('Error reading file: ' + err.message, 'error'); document.getElementById('loading').style.display = 'none'; }
             };
             reader.readAsText(file);
         }
-        
-        // Setup event listeners
-        function setupEventListeners() {
-            // Navigation buttons
-            document.getElementById('nav-map').addEventListener('click', showMapView);
-            document.getElementById('nav-list').addEventListener('click', showListView);
-            // document.getElementById('nav-load').addEventListener('click', showLoadView); // Old listener
 
-            const navLoadButton = document.getElementById('nav-load');
-            navLoadButton.addEventListener('click', function(event) {
-                event.preventDefault(); // Prevent any default button behavior
-                document.getElementById('file-input').click();
-                // The active state will be managed by showMapView/showListView after file load
-                // or if the user clicks another tab. #nav-load should not stay active.
-            });
-            
-            // File input
-            document.getElementById('file-input').addEventListener('change', handleFileSelect);
-            
-            // Controls toggle
-            document.getElementById('controls-toggle').addEventListener('click', function() {
-                const controls = document.getElementById('controls');
-                const toggleIcon = document.getElementById('toggle-icon');
-                const isExpanded = controls.classList.contains('expanded');
-                
-                const gearIconSVG = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>';
-                const closeIconSVG = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
-
-                if (isExpanded) { // When closing
-                    controls.classList.remove('expanded');
-                    this.classList.remove('expanded');
-                    toggleIcon.innerHTML = gearIconSVG;
-                } else { // When opening
-                    controls.classList.add('expanded');
-                    this.classList.add('expanded');
-                    toggleIcon.innerHTML = closeIconSVG;
-                }
-            });
-
-            // Toggle controls
-            document.getElementById('toggle-clustering').addEventListener('click', toggleClustering);
-            document.getElementById('toggle-heatmap').addEventListener('click', toggleHeatmap);
-
-            // Search input
-            document.getElementById('search-input').addEventListener('input', function(e) {
-                currentFilter = e.target.value;
-                renderList(currentFilter);
-                applyFilterToMap(currentFilter);
-
-                document.getElementById('search-clear').style.display =
-                    currentFilter.length > 0 ? 'block' : 'none';
-            });
-
-            // Clear filter buttons
-            document.getElementById('clear-filter').addEventListener('click', function() {
-                currentFilter = '';
-                document.getElementById('search-input').value = '';
-                document.getElementById('search-clear').style.display = 'none';
-                renderList();
-                applyFilterToMap('');
-                this.style.display = 'none';
-            });
-
-            document.getElementById('search-clear').addEventListener('click', function() {
-                currentFilter = '';
-                document.getElementById('search-input').value = '';
-                renderList();
-                applyFilterToMap('');
-                this.style.display = 'none';
-            });
-
-            // Map events
-            map.on('moveend zoomend', function() {
-                if (isHeatmapEnabled) {
-                    updateHeatmap();
-                }
-            });
-
-            // Click outside to close controls
-            document.addEventListener('click', function(e) {
-                const controlsWrapper = document.getElementById('controls-wrapper');
-                const controls = document.getElementById('controls');
-                const toggle = document.getElementById('controls-toggle');
-
-                if (!controlsWrapper.contains(e.target) && controls.classList.contains('expanded')) {
-                    controls.classList.remove('expanded');
-                    toggle.classList.remove('expanded');
-                    document.getElementById('toggle-icon').textContent = '⚙️';
-                }
-            });
-        }
-
-        // --- Geolocation Functions ---
-
+        // --- Geolocation and Orientation Functions ---
         function handleUserLocation(position) {
             const { latitude, longitude, accuracy } = position.coords;
             console.log(`User location: Lat ${latitude}, Lon ${longitude}, Accuracy ${accuracy.toFixed(0)}m`);
-            showStatusMessage(`Location: ${accuracy.toFixed(0)}m accuracy`, 'info', 3000);
+            const accuracyElement = document.getElementById('accuracy-display');
+            if (accuracyElement) {
+                accuracyElement.textContent = `Accuracy: ±${accuracy.toFixed(0)}m`;
+                accuracyElement.classList.add('visible');
+            }
+
+            let currentIconToUse = (mapOrientationMode === 'headingUp') ? userLocationDotIconForMapRotate : userLocationArrowIcon;
 
             if (!userLocationMarker) {
-                userLocationMarker = L.marker([latitude, longitude], { icon: userLocationArrowIcon }).addTo(map);
+                userLocationMarker = L.marker([latitude, longitude], { icon: currentIconToUse }).addTo(map);
             } else {
+                userLocationMarker.setIcon(currentIconToUse); // Ensure icon is correct for mode
                 userLocationMarker.setLatLng([latitude, longitude]);
             }
 
-            // Apply rotation if orientation is enabled (marker exists or was just created)
-            if (isOrientationEnabled && userLocationMarker) {
-                const iconEl = userLocationMarker.getElement();
-                if (iconEl && iconEl.firstChild) {
-                    iconEl.firstChild.style.transform = `rotate(${currentHeading}deg)`;
+            // Apply rotation based on mode and enabled features
+            if (mapOrientationMode === 'headingUp') {
+                // Dot icon is used, ensure it's not rotated by device orientation
+                if (userLocationMarker.getElement() && userLocationMarker.getElement().firstChild) {
+                     userLocationMarker.getElement().firstChild.style.transform = 'rotate(0deg)';
+                }
+            } else { // mapOrientationMode === 'northUp'
+                if (isOrientationEnabled) { // Device heading for marker is enabled
+                    if (userLocationMarker.getElement() && userLocationMarker.getElement().firstChild) {
+                        userLocationMarker.getElement().firstChild.style.transform = `rotate(${currentHeading}deg)`;
+                    }
+                } else { // Device heading for marker is disabled
+                    if (userLocationMarker.getElement() && userLocationMarker.getElement().firstChild) {
+                        userLocationMarker.getElement().firstChild.style.transform = 'rotate(0deg)';
+                    }
                 }
             }
 
-
             if (!userLocationAccuracyCircle) {
-                userLocationAccuracyCircle = L.circle([latitude, longitude], {
-                    radius: accuracy,
-                    weight: 1, // Thin border for accuracy circle
-                    color: 'var(--primary-color)',
-                    fillColor: 'var(--primary-color)',
-                    fillOpacity: 0.1
-                }).addTo(map);
+                userLocationAccuracyCircle = L.circle([latitude, longitude], { radius: accuracy, weight: 1, color: 'var(--primary-color)', fillColor: 'var(--primary-color)', fillOpacity: 0.1 }).addTo(map);
             } else {
                 userLocationAccuracyCircle.setLatLng([latitude, longitude]).setRadius(accuracy);
             }
-
-            if (!initialLocationFound) {
-                map.setView([latitude, longitude], 16);
-                initialLocationFound = true;
-            }
+            if (!initialLocationFound) { map.setView([latitude, longitude], 16); initialLocationFound = true; }
         }
 
         function handleOrientation(event) {
-            if (!isOrientationEnabled || !userLocationMarker) return;
+            if (!userLocationMarker && mapOrientationMode !== 'headingUp') return; // No marker to rotate & map not rotating
 
-            let heading = null;
-
-            if (event.webkitCompassHeading) { // iOS
-                heading = event.webkitCompassHeading;
-            } else if (event.absolute === true && event.alpha !== null) { // Standard
-                heading = event.alpha;
-            }
+            let heading = event.webkitCompassHeading || (event.absolute === true && event.alpha !== null ? event.alpha : null);
 
             if (heading !== null) {
-                currentHeading = heading;
-                const iconElement = userLocationMarker.getElement();
-                if (iconElement && iconElement.firstChild) {
-                    const actualVisualElement = iconElement.firstChild;
-                    actualVisualElement.style.transform = `rotate(${heading}deg)`;
+                currentHeading = heading; // Always store the latest heading
+
+                if (mapOrientationMode === 'headingUp') {
+                    if (map && typeof map.setBearing === 'function') {
+                        map.setBearing(heading);
+                    }
+                    // Ensure dot icon itself is not rotated by device orientation
+                    if (userLocationMarker && userLocationMarker.getElement() && userLocationMarker.getElement().firstChild) {
+                         userLocationMarker.getElement().firstChild.style.transform = 'rotate(0deg)';
+                    }
+                } else { // mapOrientationMode === 'northUp'
+                    if (isOrientationEnabled && userLocationMarker) { // Only rotate marker if its own heading toggle is on
+                        const iconElement = userLocationMarker.getElement();
+                        if (iconElement && iconElement.firstChild) {
+                            iconElement.firstChild.style.transform = `rotate(${heading}deg)`;
+                        }
+                    }
                 }
             }
         }
 
-        function toggleOrientation() {
+        function toggleOrientation() { // For device heading on marker
+            if (mapOrientationMode === 'headingUp') {
+                showStatusMessage("Marker heading N/A when map rotates.", 'info');
+                document.getElementById('toggle-orientation').classList.remove('active'); // Ensure it's visually off
+                isOrientationEnabled = false; // Ensure state is off
+                return;
+            }
             isOrientationEnabled = !isOrientationEnabled;
             document.getElementById('toggle-orientation').classList.toggle('active', isOrientationEnabled);
 
             if (isOrientationEnabled) {
                 if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                    DeviceOrientationEvent.requestPermission()
-                        .then(permissionState => {
-                            if (permissionState === 'granted') {
-                                window.addEventListener('deviceorientationabsolute', handleOrientation, true);
-                                window.addEventListener('deviceorientation', handleOrientation, true); // Fallback
-                                showStatusMessage('Compass heading enabled.', 'info');
-                            } else {
-                                showStatusMessage('Permission for device orientation not granted.', 'error');
-                                isOrientationEnabled = false;
-                                document.getElementById('toggle-orientation').classList.remove('active');
-                            }
-                        })
-                        .catch(error => {
-                            console.error("Error requesting device orientation permission:", error);
-                            showStatusMessage('Could not enable compass: ' + error.message, 'error');
-                            isOrientationEnabled = false;
-                            document.getElementById('toggle-orientation').classList.remove('active');
-                        });
+                    DeviceOrientationEvent.requestPermission().then(state => {
+                        if (state === 'granted') {
+                            window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+                            window.addEventListener('deviceorientation', handleOrientation, true);
+                            showStatusMessage('Marker heading enabled.', 'info');
+                        } else {
+                            showStatusMessage('Permission for device orientation not granted.', 'error');
+                            isOrientationEnabled = false; document.getElementById('toggle-orientation').classList.remove('active');
+                        }
+                    }).catch(err => {
+                        console.error("Error requesting device orientation permission:", err);
+                        showStatusMessage('Could not enable compass: ' + err.message, 'error');
+                        isOrientationEnabled = false; document.getElementById('toggle-orientation').classList.remove('active');
+                    });
                 } else {
-                    if ('ondeviceorientationabsolute' in window) {
-                        window.addEventListener('deviceorientationabsolute', handleOrientation, true);
-                    } else if ('ondeviceorientation' in window) {
-                        window.addEventListener('deviceorientation', handleOrientation, true);
-                    } else {
-                         showStatusMessage('Device orientation not supported on this browser.', 'error');
-                         isOrientationEnabled = false;
-                         document.getElementById('toggle-orientation').classList.remove('active');
-                         return;
-                    }
-                    showStatusMessage('Compass heading enabled.', 'info');
+                    if ('ondeviceorientationabsolute' in window) window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+                    else if ('ondeviceorientation' in window) window.addEventListener('deviceorientation', handleOrientation, true);
+                    else { showStatusMessage('Device orientation not supported.', 'error'); isOrientationEnabled = false; document.getElementById('toggle-orientation').classList.remove('active'); return; }
+                    showStatusMessage('Marker heading enabled.', 'info');
                 }
-            } else { // Disabling orientation
+            } else {
                 window.removeEventListener('deviceorientationabsolute', handleOrientation, true);
                 window.removeEventListener('deviceorientation', handleOrientation, true);
-                showStatusMessage('Compass heading disabled.', 'info');
-                if (userLocationMarker) {
-                    const iconElement = userLocationMarker.getElement();
-                    if (iconElement && iconElement.firstChild) {
-                        iconElement.firstChild.style.transform = 'rotate(0deg)';
-                    }
+                showStatusMessage('Marker heading disabled.', 'info');
+                if (userLocationMarker && mapOrientationMode === 'northUp') { // Only reset rotation if map is North Up
+                    const el = userLocationMarker.getElement(); if (el && el.firstChild) el.firstChild.style.transform = 'rotate(0deg)';
                 }
                 currentHeading = 0;
             }
@@ -832,169 +499,152 @@
             isLocating = false;
             document.getElementById('my-location-button').classList.remove('active-locating');
             initialLocationFound = false;
-
+            const accuracyElement = document.getElementById('accuracy-display');
+            if (accuracyElement) { accuracyElement.classList.remove('visible'); accuracyElement.textContent = 'Accuracy: ---';}
             let message = "Could not retrieve your location.";
             switch(error.code) {
                 case error.PERMISSION_DENIED:
                     message = "Location permission denied. Please enable it in your browser settings.";
-                    if (locationWatchId !== null) navigator.geolocation.clearWatch(locationWatchId);
-                    locationWatchId = null;
+                    if (locationWatchId !== null) navigator.geolocation.clearWatch(locationWatchId); locationWatchId = null;
                     if (userLocationMarker) { userLocationMarker.remove(); userLocationMarker = null; }
                     if (userLocationAccuracyCircle) { userLocationAccuracyCircle.remove(); userLocationAccuracyCircle = null; }
-                    if (isOrientationEnabled) toggleOrientation(); // Turn off if permission denied
+                    if (isOrientationEnabled) toggleOrientation();
                     break;
                 case error.POSITION_UNAVAILABLE:
                     message = "Location information is unavailable.";
                     if (userLocationMarker) { userLocationMarker.remove(); userLocationMarker = null; }
                     if (userLocationAccuracyCircle) { userLocationAccuracyCircle.remove(); userLocationAccuracyCircle = null; }
-                    if (isOrientationEnabled) toggleOrientation(); // Turn off if position unavailable
+                    if (isOrientationEnabled) toggleOrientation();
                     break;
-                case error.TIMEOUT:
-                    message = "The request to get user location timed out.";
-                    break;
-                default:
-                    message = "An unknown error occurred: " + error.message;
-                    break;
+                case error.TIMEOUT: message = "The request to get user location timed out."; break;
+                default: message = "An unknown error occurred: " + error.message; break;
             }
             showStatusMessage(message, 'error');
         }
 
         function toggleUserLocationWatch() {
             const myLocationButton = document.getElementById('my-location-button');
-            if (locationWatchId !== null) { // Currently watching, so stop
-                if (isOrientationEnabled) toggleOrientation(); // Turn off orientation first
+            if (locationWatchId !== null) {
+                if (isOrientationEnabled) toggleOrientation();
                 navigator.geolocation.clearWatch(locationWatchId);
-                locationWatchId = null;
-                isLocating = false;
-                initialLocationFound = false; // Reset this flag
-                if (userLocationMarker) {
-                    userLocationMarker.remove();
-                    userLocationMarker = null;
-                }
-                if (userLocationAccuracyCircle) {
-                    userLocationAccuracyCircle.remove();
-                    userLocationAccuracyCircle = null;
-                }
+                locationWatchId = null; isLocating = false; initialLocationFound = false;
+                if (userLocationMarker) { userLocationMarker.remove(); userLocationMarker = null; }
+                if (userLocationAccuracyCircle) { userLocationAccuracyCircle.remove(); userLocationAccuracyCircle = null; }
+                const accDisp = document.getElementById('accuracy-display'); if (accDisp) { accDisp.classList.remove('visible'); accDisp.textContent = 'Accuracy: ---';}
                 showStatusMessage("Stopped tracking your location.", 'info');
                 myLocationButton.classList.remove('active-locating');
-            } else { // Not watching, so start
+            } else {
                 if (navigator.geolocation) {
-                    isLocating = true;
-                    myLocationButton.classList.add('active-locating');
+                    isLocating = true; myLocationButton.classList.add('active-locating');
                     showStatusMessage("Trying to find your location...", 'info', 2000);
-
-                    const options = {
-                        enableHighAccuracy: true,
-                        timeout: 10000,
-                        maximumAge: 0
-                    };
-                    locationWatchId = navigator.geolocation.watchPosition(
-                        handleUserLocation,
-                        handleLocationError,
-                        options
-                    );
+                    const options = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
+                    locationWatchId = navigator.geolocation.watchPosition(handleUserLocation, handleLocationError, options);
                 } else {
                     showStatusMessage("Geolocation is not supported by your browser.", 'error');
                 }
             }
         }
 
+        // --- Map Orientation Functions ---
+        function updateMapOrientationButtonIcon() {
+            const button = document.getElementById('map-orientation-button');
+            if (!button) return;
+            if (mapOrientationMode === 'northUp') {
+                button.innerHTML = compassNorthUpIconSvg;
+                button.title = "Toggle map orientation (Current: North Up)";
+            } else if (mapOrientationMode === 'headingUp') {
+                button.innerHTML = deviceHeadingUpIconSvg;
+                button.title = "Toggle map orientation (Current: Device Heading Up)";
+            }
+        }
+
+        function toggleMapOrientation() {
+            const markerHeadingToggle = document.getElementById('toggle-orientation');
+            if (mapOrientationMode === 'northUp') {
+                mapOrientationMode = 'headingUp';
+                showStatusMessage("Map: Device Heading Up", "info");
+                if (map && typeof map.setBearing === 'function') {
+                    // Initial rotation will be set by the next handleOrientation event if device orientation is active
+                    // or use currentHeading if available from marker orientation
+                     map.setBearing(currentHeading);
+                }
+                if (userLocationMarker) userLocationMarker.setIcon(userLocationDotIconForMapRotate);
+                // Disable and visually update device heading toggle for marker
+                markerHeadingToggle.classList.add('disabled-by-map-rotation');
+                markerHeadingToggle.classList.remove('active'); // Ensure it's not visually active
+                // No need to change isOrientationEnabled here, as marker heading is just suppressed
+            } else {
+                mapOrientationMode = 'northUp';
+                showStatusMessage("Map: North Up", "info");
+                if (map && typeof map.setBearing === 'function') map.setBearing(0);
+                if (userLocationMarker) {
+                    userLocationMarker.setIcon(userLocationArrowIcon);
+                    // Re-apply marker rotation if device heading is enabled
+                    if (isOrientationEnabled) {
+                        const iconEl = userLocationMarker.getElement();
+                        if (iconEl && iconEl.firstChild) iconEl.firstChild.style.transform = `rotate(${currentHeading}deg)`;
+                    } else { // Ensure it's not rotated
+                        const iconEl = userLocationMarker.getElement();
+                        if (iconEl && iconEl.firstChild) iconEl.firstChild.style.transform = 'rotate(0deg)';
+                    }
+                }
+                markerHeadingToggle.classList.remove('disabled-by-map-rotation');
+            }
+            updateMapOrientationButtonIcon();
+        }
+
         // Setup event listeners
         function setupEventListeners() {
-            // Navigation buttons
             document.getElementById('nav-map').addEventListener('click', showMapView);
             document.getElementById('nav-list').addEventListener('click', showListView);
-
-            const navLoadButton = document.getElementById('nav-load');
-            navLoadButton.addEventListener('click', function(event) {
-                event.preventDefault();
-                document.getElementById('file-input').click();
-            });
-
-            // File input
+            document.getElementById('nav-load').addEventListener('click', function(e) { e.preventDefault(); document.getElementById('file-input').click(); });
             document.getElementById('file-input').addEventListener('change', handleFileSelect);
-
-            // "My Location" button
             document.getElementById('my-location-button').addEventListener('click', toggleUserLocationWatch);
+            document.getElementById('toggle-orientation').addEventListener('click', toggleOrientation); // Device heading for marker
+            document.getElementById('map-orientation-button').addEventListener('click', toggleMapOrientation); // Map orientation
 
-            // Orientation Toggle
-            document.getElementById('toggle-orientation').addEventListener('click', toggleOrientation);
-
-            // Controls toggle
             document.getElementById('controls-toggle').addEventListener('click', function() {
                 const controls = document.getElementById('controls');
                 const toggleIcon = document.getElementById('toggle-icon');
                 const isExpanded = controls.classList.contains('expanded');
-
                 const gearIconSVG = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>';
                 const closeIconSVG = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
-
-                if (isExpanded) { // When closing
-                    controls.classList.remove('expanded');
-                    this.classList.remove('expanded');
-                    toggleIcon.innerHTML = gearIconSVG;
-                } else { // When opening
-                    controls.classList.add('expanded');
-                    this.classList.add('expanded');
-                    toggleIcon.innerHTML = closeIconSVG;
-                }
+                if (isExpanded) { controls.classList.remove('expanded'); this.classList.remove('expanded'); toggleIcon.innerHTML = gearIconSVG; }
+                else { controls.classList.add('expanded'); this.classList.add('expanded'); toggleIcon.innerHTML = closeIconSVG; }
             });
             
-            // Toggle controls
             document.getElementById('toggle-clustering').addEventListener('click', toggleClustering);
             document.getElementById('toggle-heatmap').addEventListener('click', toggleHeatmap);
-            
-            // Search input
             document.getElementById('search-input').addEventListener('input', function(e) {
-                currentFilter = e.target.value;
-                renderList(currentFilter);
-                applyFilterToMap(currentFilter);
-                
-                document.getElementById('search-clear').style.display = 
-                    currentFilter.length > 0 ? 'block' : 'none';
+                currentFilter = e.target.value; renderList(currentFilter); applyFilterToMap(currentFilter);
+                document.getElementById('search-clear').style.display = currentFilter.length > 0 ? 'block' : 'none';
             });
-            
-            // Clear filter buttons
             document.getElementById('clear-filter').addEventListener('click', function() {
-                currentFilter = '';
-                document.getElementById('search-input').value = '';
+                currentFilter = ''; document.getElementById('search-input').value = '';
                 document.getElementById('search-clear').style.display = 'none';
-                renderList();
-                applyFilterToMap('');
-                this.style.display = 'none';
+                renderList(); applyFilterToMap(''); this.style.display = 'none';
             });
-            
             document.getElementById('search-clear').addEventListener('click', function() {
-                currentFilter = '';
-                document.getElementById('search-input').value = '';
-                renderList();
-                applyFilterToMap('');
-                this.style.display = 'none';
+                currentFilter = ''; document.getElementById('search-input').value = '';
+                renderList(); applyFilterToMap(''); this.style.display = 'none';
             });
-            
-            // Map events
-            map.on('moveend zoomend', function() {
-                if (isHeatmapEnabled) {
-                    updateHeatmap();
-                }
-            });
-            
-            // Click outside to close controls
+            map.on('moveend zoomend', () => { if (isHeatmapEnabled) updateHeatmap(); });
             document.addEventListener('click', function(e) {
                 const controlsWrapper = document.getElementById('controls-wrapper');
                 const controls = document.getElementById('controls');
                 const toggle = document.getElementById('controls-toggle');
-                
-                if (!controlsWrapper.contains(e.target) && controls.classList.contains('expanded')) {
+                const toggleIcon = document.getElementById('toggle-icon'); // Need to get toggleIcon here
+                const gearIconSVG = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>';
+
+                if (controlsWrapper && !controlsWrapper.contains(e.target) && controls && controls.classList.contains('expanded')) {
                     controls.classList.remove('expanded');
-                    toggle.classList.remove('expanded');
-                    document.getElementById('toggle-icon').innerHTML = // Set back to gear icon
-                        '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>';
+                    if (toggle) toggle.classList.remove('expanded');
+                    if (toggleIcon) toggleIcon.innerHTML = gearIconSVG;
                 }
             });
+            updateMapOrientationButtonIcon();
         }
         
-        // Initialize on load
         window.addEventListener('DOMContentLoaded', init);
     </script>
 </body>

@@ -22,6 +22,7 @@
     --light-bg-hover: #e9ecef; /* For elements with light-bg background */
 
     --dark-text: #212529;
+    --dark-text-rgb: 33, 37, 41; /* Added for rgba backgrounds */
     --medium-text: #495057;
     --light-text: #f8f9fa; /* Text on dark backgrounds */
     --white-color: #fff; /* Explicit white */
@@ -67,6 +68,7 @@ body {
 #map {
     height: calc(100vh - 60px);
     width: 100%;
+    transition: transform 0.3s ease-out; /* For map rotation */
 }
 
 #list-view {
@@ -289,6 +291,14 @@ body {
 }
 .toggle.active:hover {
      box-shadow: 0 0 0 4px rgba(var(--primary-rgb), 0.2);
+}
+
+.toggle.disabled-by-map-rotation {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.toggle.disabled-by-map-rotation .toggle-slider {
+    cursor: not-allowed;
 }
 
 
@@ -611,11 +621,11 @@ body {
 }
 
 #my-location-button {
-    top: 70px;
+    bottom: calc(60px + 20px);
     left: 15px;
     width: 44px;
     height: 44px;
-    display: none;
+    /* display: none; JS handles this */
 }
 
 #my-location-button.active-locating {
@@ -623,9 +633,21 @@ body {
     animation: pulse-location-button 1.5s infinite ease-in-out;
 }
 
+#map-orientation-button {
+    bottom: calc(60px + 20px + 44px + 10px);
+    left: 15px;
+    width: 44px;
+    height: 44px;
+    /* display: none; JS handles this */
+}
+#map-orientation-button svg {
+    stroke: currentColor;
+}
+
+
 @keyframes pulse-location-button {
     0% {
-        box-shadow: 0 0 0 0 rgba(var(--primary-rgb), 0.4), var(--shadow-md); /* Keep original shadow too */
+        box-shadow: 0 0 0 0 rgba(var(--primary-rgb), 0.4), var(--shadow-md);
     }
     70% {
         box-shadow: 0 0 0 10px rgba(var(--primary-rgb), 0), var(--shadow-md);
@@ -633,6 +655,28 @@ body {
     100% {
         box-shadow: 0 0 0 0 rgba(var(--primary-rgb), 0), var(--shadow-md);
     }
+}
+
+#accuracy-display {
+    position: absolute;
+    bottom: calc(60px + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(var(--dark-text-rgb), 0.75);
+    color: var(--light-text);
+    padding: 5px 10px;
+    border-radius: var(--border-radius-md);
+    font-size: 12px;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease-in-out;
+    display: block;
+}
+
+#accuracy-display.visible {
+    opacity: 1;
+    pointer-events: auto;
 }
 
 
@@ -660,6 +704,14 @@ body {
 
     .toggle-control label {
         font-size: 13px;
+    }
+
+    .toggle.disabled-by-map-rotation { /* Ensure disabled style applies on mobile too */
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .toggle.disabled-by-map-rotation .toggle-slider {
+        cursor: not-allowed;
     }
 
     .waypoint-item {
@@ -736,7 +788,7 @@ body {
     }
 
     #my-location-button {
-        top: 65px;
+        bottom: calc(60px + 15px);
         left: 10px;
         width: 40px;
         height: 40px;
@@ -744,5 +796,22 @@ body {
     #my-location-button svg {
         width: 20px;
         height: 20px;
+    }
+
+    #map-orientation-button {
+        bottom: calc(60px + 15px + 40px + 10px);
+        left: 10px;
+        width: 40px;
+        height: 40px;
+    }
+    #map-orientation-button svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    #accuracy-display {
+        bottom: calc(60px + 5px);
+        font-size: 11px;
+        padding: 4px 8px;
     }
 }
